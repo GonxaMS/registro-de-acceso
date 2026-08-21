@@ -1,0 +1,86 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /personal/{id} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && id.matches('P[0-9]{4}')
+        && request.resource.data.keys().hasOnly([
+          'nombre','estado','ultimoMovimiento','fecha','hora','actualizado','activo'
+        ])
+        && request.resource.data.nombre is string
+        && request.resource.data.estado == 'Fuera'
+        && request.resource.data.activo == true;
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'estado','ultimoMovimiento','fecha','hora','actualizado','activo'
+        ])
+        && request.resource.data.estado in ['Dentro','Fuera'];
+      allow delete: if false;
+    }
+
+    match /movimientos/{id} {
+      function validUser() {
+        return request.resource.data.usuario is string
+          && request.resource.data.usuario.size() >= 2
+          && request.resource.data.usuario.size() <= 80;
+      }
+      function validCorrection() {
+        return !request.resource.data.keys().hasAny(['esCorreccion','reemplazaA'])
+          || (request.resource.data.esCorreccion == true
+            && request.resource.data.reemplazaA is string
+            && request.resource.data.reemplazaA.matches('M[0-9]{6}')
+            && request.resource.data.reemplazaA != id
+            && exists(/databases/$(database)/documents/movimientos/$(request.resource.data.reemplazaA))
+            && get(/databases/$(database)/documents/movimientos/$(request.resource.data.reemplazaA)).data.personalId
+              == request.resource.data.personalId
+            && get(/databases/$(database)/documents/movimientos/$(request.resource.data.reemplazaA)).data.movimiento
+              == request.resource.data.movimiento
+            && get(/databases/$(database)/documents/movimientos/$(request.resource.data.reemplazaA)).data.fecha
+              == request.resource.data.fecha);
+      }
+      function validCancellation() {
+        return request.resource.data.anulaA is string
+          && request.resource.data.anulaA.matches('M[0-9]{6}')
+          && request.resource.data.anulaA != id
+          && exists(/databases/$(database)/documents/movimientos/$(request.resource.data.anulaA))
+          && get(/databases/$(database)/documents/movimientos/$(request.resource.data.anulaA)).data.personalId
+            == request.resource.data.personalId
+          && get(/databases/$(database)/documents/movimientos/$(request.resource.data.anulaA)).data.fecha
+            == request.resource.data.fecha
+          && ((request.resource.data.movimiento == 'AnulacionIngreso'
+            && get(/databases/$(database)/documents/movimientos/$(request.resource.data.anulaA)).data.movimiento == 'Ingreso')
+            || (request.resource.data.movimiento == 'AnulacionSalida'
+            && get(/databases/$(database)/documents/movimientos/$(request.resource.data.anulaA)).data.movimiento == 'Salida'));
+      }
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly([
+          'movimientoId','personalId','nombre','movimiento','fecha','hora',
+          'creado','usuario','esCorreccion','reemplazaA','anulaA'
+        ])
+        && id.matches('M[0-9]{6}')
+        && request.resource.data.movimientoId == id
+        && request.resource.data.personalId.matches('P[0-9]{4}')
+        && validUser()
+        && ((request.resource.data.movimiento in ['Ingreso','Salida']
+          && !request.resource.data.keys().hasAny(['anulaA'])
+          && validCorrection())
+          || (request.resource.data.movimiento in ['AnulacionIngreso','AnulacionSalida']
+          && !request.resource.data.keys().hasAny(['esCorreccion','reemplazaA'])
+          && validCancellation()));
+      allow update, delete: if false;
+    }
+
+    match /meta/{id} {
+      allow read: if request.auth != null && id == 'config';
+      allow create, update: if request.auth != null && id == 'config'
+        && request.resource.data.keys().hasOnly(['siguienteId','siguienteMovimiento'])
+        && (!request.resource.data.keys().hasAny(['siguienteId'])
+          || request.resource.data.siguienteId is int)
+        && (!request.resource.data.keys().hasAny(['siguienteMovimiento'])
+          || request.resource.data.siguienteMovimiento is int);
+      allow delete: if false;
+    }
+  }
+}

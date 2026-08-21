@@ -1,0 +1,25 @@
+# Android / Gradle
+.gradle/
+**/build/
+*.iml
+.idea/
+local.properties
+.firebaserc
+
+# Firebase configuration of the production project
+app/google-services.json
+
+# Generated packages and local archives
+*.apk
+*.aab
+outputs/
+
+# Editor and operating-system files
+.DS_Store
+Thumbs.db
+
+# Local integration code that contains the Sheets endpoint and connection key
+../apps-script-live/
+
+# Local Gradle cache copied during development
+work/
