@@ -3,10 +3,17 @@
     <color name="navy">#07317E</color>
     <color name="blue">#0B56D0</color>
     <color name="blue_dark">#083C98</color>
+    <color name="green">#15803D</color>
+    <color name="green_dark">#116832</color>
+    <color name="gold">#F5B019</color>
+    <color name="gold_dark">#D49310</color>
     <color name="surface">#F5F7FB</color>
     <color name="white">#FFFFFF</color>
     <color name="text">#10233F</color>
     <color name="muted">#61728A</color>
     <color name="line">#DCE4F0</color>
     <color name="badge">#EAF1FC</color>
+    <color name="disabled_bg">#E4E8EF</color>
+    <color name="disabled_stroke">#C8D0DC</color>
+    <color name="disabled_text">#8B98AA</color>
 </resources>

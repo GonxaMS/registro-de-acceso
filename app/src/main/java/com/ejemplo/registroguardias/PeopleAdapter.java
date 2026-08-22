@@ -63,7 +63,8 @@ final class PeopleAdapter extends BaseAdapter {
 
     private static void setEnabled(Button button, boolean enabled) {
         button.setEnabled(enabled);
-        button.setAlpha(enabled ? 1f : 0.35f);
+        button.setAlpha(1f);
+        button.setTextColor(Color.parseColor(enabled ? "#FFFFFF" : "#8B98AA"));
     }
 
     private static final class Holder {

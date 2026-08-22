@@ -58,12 +58,12 @@
                 android:layout_width="94dp"
                 android:layout_height="46dp"
                 android:layout_marginEnd="4dp"
-                android:background="@drawable/button_exit"
+                android:background="@drawable/button_keys"
                 android:minHeight="0dp"
                 android:minWidth="0dp"
                 android:text="@string/keys_shortcut"
                 android:textAllCaps="false"
-                android:textColor="@color/blue"
+                android:textColor="@color/text"
                 android:textSize="16sp"
                 android:textStyle="bold" />
 
