@@ -236,11 +236,13 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
         PopupMenu menu = new PopupMenu(this, anchor);
         menu.getMenu().add("Agregar operario");
         menu.getMenu().add("Mostrar operarios ocultos");
+        menu.getMenu().add("Registro de llaves");
         menu.getMenu().add("Cambiar usuario");
         menu.setOnMenuItemClickListener(item -> {
             String option = item.getTitle().toString();
             if (option.startsWith("Agregar")) showAddDialog();
             else if (option.startsWith("Mostrar")) showHiddenPeople();
+            else if (option.startsWith("Registro")) startActivity(new Intent(this, KeysActivity.class));
             else showChangeUserDialog();
             return true;
         });

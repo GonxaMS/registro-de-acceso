@@ -11,4 +11,10 @@
     <string name="setup_explanation">Identifica quién utilizará este dispositivo</string>
     <string name="user_name_hint">Nombre del usuario</string>
     <string name="continue_label">Continuar</string>
+    <string name="keys_title">Registro de llaves</string>
+    <string name="search_keys_hint">Buscar llave</string>
+    <string name="take_key">Retirar</string>
+    <string name="return_key">Devolver</string>
+    <string name="key_options">Opciones de la llave</string>
+    <string name="back">Volver</string>
 </resources>

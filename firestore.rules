@@ -72,14 +72,77 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /llaves/{id} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && id.matches('K[0-9]{4}')
+        && request.resource.data.keys().hasOnly([
+          'nombre','estado','quienTiene','fechaRetiro','horaRetiro',
+          'ultimoMovimiento','ultimaFecha','ultimaHora','actualizado','activo'
+        ])
+        && request.resource.data.nombre is string
+        && request.resource.data.estado == 'Disponible'
+        && request.resource.data.activo == true;
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'estado','quienTiene','fechaRetiro','horaRetiro',
+          'ultimoMovimiento','ultimaFecha','ultimaHora','actualizado','activo'
+        ])
+        && request.resource.data.estado in ['Disponible','Prestada'];
+      allow delete: if false;
+    }
+
+    match /movimientosLlaves/{id} {
+      function validKeyUser() {
+        return request.resource.data.usuario is string
+          && request.resource.data.usuario.size() >= 2
+          && request.resource.data.usuario.size() <= 80;
+      }
+      function validKeyPerson() {
+        return request.resource.data.persona is string
+          && request.resource.data.persona.size() >= 2
+          && request.resource.data.persona.size() <= 80;
+      }
+      function validTake() {
+        return request.resource.data.movimiento == 'Retiro'
+          && request.resource.data.quienRetira == request.resource.data.persona
+          && !request.resource.data.keys().hasAny(['quienDevuelve']);
+      }
+      function validReturn() {
+        return request.resource.data.movimiento == 'Devolucion'
+          && request.resource.data.quienDevuelve == request.resource.data.persona
+          && !request.resource.data.keys().hasAny(['quienRetira']);
+      }
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && id.matches('L[0-9]{6}')
+        && request.resource.data.keys().hasOnly([
+          'movimientoId','llaveId','llaveNombre','movimiento','persona',
+          'quienRetira','quienDevuelve','fecha','hora','usuario','creado'
+        ])
+        && request.resource.data.movimientoId == id
+        && request.resource.data.llaveId.matches('K[0-9]{4}')
+        && request.resource.data.llaveNombre is string
+        && validKeyPerson()
+        && validKeyUser()
+        && (validTake() || validReturn());
+      allow update, delete: if false;
+    }
+
     match /meta/{id} {
       allow read: if request.auth != null && id == 'config';
       allow create, update: if request.auth != null && id == 'config'
-        && request.resource.data.keys().hasOnly(['siguienteId','siguienteMovimiento'])
+        && request.resource.data.keys().hasOnly([
+          'siguienteId','siguienteMovimiento','siguienteLlave','siguienteMovimientoLlave'
+        ])
         && (!request.resource.data.keys().hasAny(['siguienteId'])
           || request.resource.data.siguienteId is int)
         && (!request.resource.data.keys().hasAny(['siguienteMovimiento'])
-          || request.resource.data.siguienteMovimiento is int);
+          || request.resource.data.siguienteMovimiento is int)
+        && (!request.resource.data.keys().hasAny(['siguienteLlave'])
+          || request.resource.data.siguienteLlave is int)
+        && (!request.resource.data.keys().hasAny(['siguienteMovimientoLlave'])
+          || request.resource.data.siguienteMovimientoLlave is int);
       allow delete: if false;
     }
   }
