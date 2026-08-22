@@ -35,7 +35,7 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
     private final List<KeyItem> visibleKeys = new ArrayList<>();
     private final List<KeyItem> hiddenKeys = new ArrayList<>();
     private final List<KeyItem> filteredKeys = new ArrayList<>();
-    private final List<Person> activePeople = new ArrayList<>();
+    private final List<SelectablePerson> selectablePeople = new ArrayList<>();
 
     private FirebaseFirestore database;
     private ListenerRegistration keysListener;
@@ -113,16 +113,14 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
     private void listenForPeople() {
         peopleListener = database.collection("personal").addSnapshotListener((snapshot, error) -> {
             if (error != null || snapshot == null) return;
-            activePeople.clear();
+            selectablePeople.clear();
             for (DocumentSnapshot document : snapshot.getDocuments()) {
                 Boolean active = document.getBoolean("activo");
-                if (active != null && !active) continue;
-                activePeople.add(new Person(
-                    document.getId(), document.getString("nombre"), document.getString("estado"),
-                    document.getString("ultimoMovimiento"), document.getString("fecha")
+                selectablePeople.add(new SelectablePerson(
+                    document.getId(), document.getString("nombre"), active != null && !active
                 ));
             }
-            Collections.sort(activePeople, (left, right) ->
+            Collections.sort(selectablePeople, (left, right) ->
                 String.CASE_INSENSITIVE_ORDER.compare(left.name, right.name));
         });
     }
@@ -149,7 +147,7 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
     }
 
     private void showPersonSelector(KeyItem key, String type) {
-        if (activePeople.isEmpty()) {
+        if (selectablePeople.isEmpty()) {
             showMessage("Sin operarios", "Todavia no hay operarios activos para elegir.");
             return;
         }
@@ -160,7 +158,7 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
         input.setSelectAllOnFocus(true);
         ListView list = new ListView(this);
         list.setDividerHeight(1);
-        List<Person> filtered = new ArrayList<>();
+        List<SelectablePerson> filtered = new ArrayList<>();
         android.widget.ArrayAdapter<String> peopleAdapter =
             new android.widget.ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
         list.setAdapter(peopleAdapter);
@@ -168,11 +166,11 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
             filtered.clear();
             peopleAdapter.clear();
             String query = input.getText().toString().trim().toLowerCase(Locale.getDefault());
-            for (Person person : activePeople) {
+            for (SelectablePerson person : selectablePeople) {
                 if (person.name.toLowerCase(Locale.getDefault()).contains(query)
                     || person.id.toLowerCase(Locale.getDefault()).contains(query)) {
                     filtered.add(person);
-                    peopleAdapter.add(person.name);
+                    peopleAdapter.add(person.label());
                 }
             }
             peopleAdapter.notifyDataSetChanged();
