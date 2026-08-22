@@ -55,6 +55,13 @@ jobs:
               path.write_text(json.dumps(data, indent=2))
           PY
 
+      - name: Create Sheets config
+        run: |
+          {
+            echo 'sheets.url=https://script.google.com/macros/s/AKfycbyerApHKgpzWBr0fqZBXX0k_N6aoAyvHUsVatbtQU-H699ET8p2mckCrxlqUgxUW7If/exec'
+            echo 'sheets.key='
+          } > local.properties
+
       - name: Build debug APK
         run: ./gradlew assembleDebug
 
