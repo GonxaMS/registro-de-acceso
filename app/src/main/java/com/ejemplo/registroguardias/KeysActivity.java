@@ -258,7 +258,8 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
             showMessage("Registro correcto",
                 (take ? person + " retiro " : person + " devolvio ") + key.name
                     + " a las " + time + ".");
-            sheets.mirrorKeyMovement(key, type, person, date, time, registeredBy);
+            sheets.mirrorKeyMovement(key, type, person, date, time, registeredBy, (ok, message) ->
+                runOnUiThread(() -> toast(ok ? "Sheets actualizado" : "Error Sheets: " + message)));
         }).addOnFailureListener(error -> showMessage("No se pudo registrar", cleanError(error)));
     }
 

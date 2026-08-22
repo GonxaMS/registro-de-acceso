@@ -24,8 +24,8 @@ android {
         applicationId = "com.ejemplo.registroguardias.llaves"
         minSdk = 23
         targetSdk = 35
-        versionCode = 19
-        versionName = "3.3.5-llaves"
+        versionCode = 20
+        versionName = "3.3.6-llaves"
         buildConfigField("String", "SHEETS_URL", "\"${sheetsUrl.replace("\"", "\\\"")}\"")
         buildConfigField("String", "SHEETS_KEY", "\"${sheetsKey.replace("\"", "\\\"")}\"")
     }

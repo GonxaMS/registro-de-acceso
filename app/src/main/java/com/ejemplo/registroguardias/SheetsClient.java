@@ -10,6 +10,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 final class SheetsClient implements AutoCloseable {
+    interface Callback {
+        void onResult(boolean ok, String message);
+    }
+
     private static final String URL_VALUE = BuildConfig.SHEETS_URL;
     private static final String KEY_VALUE = BuildConfig.SHEETS_KEY;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -25,18 +29,22 @@ final class SheetsClient implements AutoCloseable {
         ));
     }
 
-    void mirrorKeyMovement(KeyItem key, String type, String person, String date, String time, String user) {
-        executor.execute(() -> get(
-            URL_VALUE + "?clave=" + encode(KEY_VALUE)
-                + "&accion=" + encode("llave_movimiento")
-                + "&llaveId=" + encode(key.id)
-                + "&llave=" + encode(key.name)
-                + "&movimiento=" + encode(type)
-                + "&persona=" + encode(person)
-                + "&fecha=" + encode(date)
-                + "&hora=" + encode(time)
-                + "&usuario=" + encode(user)
-        ));
+    void mirrorKeyMovement(KeyItem key, String type, String person, String date, String time, String user, Callback callback) {
+        executor.execute(() -> {
+            String result = getResult(
+                URL_VALUE + "?clave=" + encode(KEY_VALUE)
+                    + "&accion=" + encode("llave_movimiento")
+                    + "&llaveId=" + encode(key.id)
+                    + "&llave=" + encode(key.name)
+                    + "&movimiento=" + encode(type)
+                    + "&persona=" + encode(person)
+                    + "&fecha=" + encode(date)
+                    + "&hora=" + encode(time)
+                    + "&usuario=" + encode(user)
+            );
+            boolean ok = result.contains("\"ok\":true");
+            if (callback != null) callback.onResult(ok, summarize(result));
+        });
     }
 
     void syncPerson(String action, Person person) {
@@ -77,6 +85,10 @@ final class SheetsClient implements AutoCloseable {
     }
 
     private static void get(String address) {
+        getResult(address);
+    }
+
+    private static String getResult(String address) {
         HttpURLConnection connection = null;
         try {
             String current = address;
@@ -87,17 +99,17 @@ final class SheetsClient implements AutoCloseable {
                 if (code != HttpURLConnection.HTTP_MOVED_TEMP
                     && code != HttpURLConnection.HTTP_MOVED_PERM
                     && code != HttpURLConnection.HTTP_SEE_OTHER) {
-                    drain(connection);
-                    return;
+                    return read(connection);
                 }
                 String location = connection.getHeaderField("Location");
                 connection.disconnect();
                 connection = null;
-                if (location == null || location.trim().isEmpty()) return;
+                if (location == null || location.trim().isEmpty()) return "Sin redireccion de Sheets";
                 current = location;
             }
-        } catch (Exception ignored) {
-            // Firebase es la fuente principal; Sheets es una copia secundaria.
+            return "Demasiadas redirecciones de Sheets";
+        } catch (Exception error) {
+            return error.getClass().getSimpleName() + ": " + String.valueOf(error.getMessage());
         } finally {
             if (connection != null) connection.disconnect();
         }
@@ -125,14 +137,30 @@ final class SheetsClient implements AutoCloseable {
     }
 
     private static void drain(HttpURLConnection connection) throws Exception {
+        read(connection);
+    }
+
+    private static String read(HttpURLConnection connection) throws Exception {
         InputStream stream = connection.getResponseCode() >= 400
             ? connection.getErrorStream()
             : connection.getInputStream();
-        if (stream == null) return;
+        if (stream == null) return "HTTP " + connection.getResponseCode();
         byte[] buffer = new byte[256];
+        StringBuilder response = new StringBuilder();
         try (InputStream input = stream) {
-            while (input.read(buffer) != -1) {}
+            int count;
+            while ((count = input.read(buffer)) != -1) {
+                response.append(new String(buffer, 0, count, StandardCharsets.UTF_8));
+                if (response.length() > 600) break;
+            }
         }
+        return "HTTP " + connection.getResponseCode() + " " + response.toString();
+    }
+
+    private static String summarize(String result) {
+        String cleaned = result == null ? "Sin respuesta" : result.replaceAll("\\s+", " ").trim();
+        if (cleaned.length() > 140) return cleaned.substring(0, 140);
+        return cleaned;
     }
 
     private static String encode(String value) {
