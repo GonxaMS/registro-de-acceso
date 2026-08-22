@@ -47,7 +47,7 @@
                     android:layout_height="wrap_content"
                     android:text="@string/keys_title"
                     android:textColor="@color/white"
-                    android:textSize="25sp"
+                    android:textSize="23sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -62,9 +62,9 @@
 
             <TextView
                 android:id="@+id/btnKeySheets"
-                android:layout_width="52dp"
-                android:layout_height="46dp"
-                android:layout_marginEnd="8dp"
+                android:layout_width="48dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="6dp"
                 android:background="@drawable/button_exit"
                 android:clickable="true"
                 android:contentDescription="@string/open_sheets"
