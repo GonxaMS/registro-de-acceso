@@ -33,6 +33,7 @@ jobs:
             exit 1
           fi
           printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          sed -i 's/"package_name": "[^"]*"/"package_name": "com.ejemplo.registroguardias.termux"/g' app/google-services.json
 
       - name: Build debug APK
         run: ./gradlew assembleDebug

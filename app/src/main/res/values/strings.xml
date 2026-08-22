@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Registro de Acceso</string>
+    <string name="app_name">Registro de Acceso Termux</string>
     <string name="app_subtitle">Control de operarios</string>
     <string name="search_hint">Buscar por nombre</string>
     <string name="more_options">Más opciones</string>
