@@ -61,6 +61,8 @@
                 android:background="@drawable/button_keys"
                 android:minHeight="0dp"
                 android:minWidth="0dp"
+                android:drawableStart="@drawable/ic_key"
+                android:drawablePadding="5dp"
                 android:text="@string/keys_shortcut"
                 android:textAllCaps="false"
                 android:textColor="@color/text"
