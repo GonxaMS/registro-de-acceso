@@ -377,7 +377,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
         new AlertDialog.Builder(this)
             .setTitle("Quitar operario")
             .setMessage("Quieres quitar a " + person.name
-                + " de la lista? No se borra de Firebase ni se pierde su historial, pero no podra restaurarse desde la app.")
+                + " de la lista? Esta accion no se podra restaurar desde la app.")
             .setNegativeButton("Cancelar", null)
             .setPositiveButton("Si, quitar", (dialog, which) ->
                 database.collection("personal").document(person.id)
