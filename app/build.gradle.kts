@@ -21,11 +21,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.ejemplo.registroguardias.termux"
+        applicationId = "com.ejemplo.registroguardias"
         minSdk = 23
         targetSdk = 35
         versionCode = 18
-        versionName = "3.3.2-termux"
+        versionName = "3.3.3-llaves"
         buildConfigField("String", "SHEETS_URL", "\"${sheetsUrl.replace("\"", "\\\"")}\"")
         buildConfigField("String", "SHEETS_KEY", "\"${sheetsKey.replace("\"", "\\\"")}\"")
     }
