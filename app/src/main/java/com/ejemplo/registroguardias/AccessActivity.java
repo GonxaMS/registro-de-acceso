@@ -73,6 +73,8 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
             new SimpleDateFormat("EEEE d 'de' MMMM 'de' yyyy", new Locale("es", "AR")).format(new Date())
         );
         findViewById(R.id.btnMenu).setOnClickListener(this::showMainMenu);
+        findViewById(R.id.btnKeysShortcut).setOnClickListener(view ->
+            startActivity(new Intent(this, KeysActivity.class)));
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence text, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence text, int start, int before, int count) {
