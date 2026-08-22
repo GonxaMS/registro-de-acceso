@@ -18,4 +18,5 @@
     <string name="key_options">Opciones de la llave</string>
     <string name="back">Volver</string>
     <string name="keys_shortcut">Llaves</string>
+    <string name="open_sheets">Abrir Sheets</string>
 </resources>

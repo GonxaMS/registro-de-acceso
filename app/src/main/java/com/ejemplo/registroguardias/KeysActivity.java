@@ -2,7 +2,9 @@ package com.ejemplo.registroguardias;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -61,6 +63,7 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
         );
         findViewById(R.id.btnBack).setOnClickListener(view -> finish());
         findViewById(R.id.btnKeyMenu).setOnClickListener(this::showMainMenu);
+        findViewById(R.id.btnKeySheets).setOnClickListener(view -> openSheets());
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence text, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence text, int start, int before, int count) {
@@ -73,6 +76,10 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
         database = FirebaseFirestore.getInstance();
         listenForKeys();
         listenForPeople();
+    }
+
+    private void openSheets() {
+        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(AccessActivity.SHEETS_WEB_URL)));
     }
 
     private void applyWindowInsets() {

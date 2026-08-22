@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.app.TimePickerDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -38,6 +39,7 @@ import java.util.Map;
 public final class AccessActivity extends Activity implements PeopleAdapter.Actions {
     static final String PREFS_NAME = "registro_guardias";
     static final String USER_NAME_KEY = "operator_user_name";
+    static final String SHEETS_WEB_URL = "https://docs.google.com/spreadsheets/d/1qh4aP9Hot-tAO5i7fEfzNTqQ2YK71xFkwgrm7uuDIcw/edit";
 
     private final List<Person> visiblePeople = new ArrayList<>();
     private final List<Person> hiddenPeople = new ArrayList<>();
@@ -73,6 +75,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
             new SimpleDateFormat("EEEE d 'de' MMMM 'de' yyyy", new Locale("es", "AR")).format(new Date())
         );
         findViewById(R.id.btnMenu).setOnClickListener(this::showMainMenu);
+        findViewById(R.id.btnSheetsShortcut).setOnClickListener(view -> openSheets());
         findViewById(R.id.btnKeysShortcut).setOnClickListener(view ->
             startActivity(new Intent(this, KeysActivity.class)));
         search.addTextChangedListener(new TextWatcher() {
@@ -90,6 +93,10 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
         else authentication.signInAnonymously()
             .addOnSuccessListener(result -> listenForPeople())
             .addOnFailureListener(error -> showMessage("Sin acceso", "No se pudo iniciar Firebase: " + cleanError(error)));
+    }
+
+    private void openSheets() {
+        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(SHEETS_WEB_URL)));
     }
 
     private void applyWindowInsets() {
