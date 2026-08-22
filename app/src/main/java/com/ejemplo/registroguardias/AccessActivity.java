@@ -50,9 +50,11 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
     private FirebaseFirestore database;
     private FirebaseAuth authentication;
     private ListenerRegistration peopleListener;
+    private ListenerRegistration keysListener;
     private SharedPreferences preferences;
     private EditText search;
     private TextView count;
+    private TextView borrowedKeys;
     private PeopleAdapter adapter;
 
     @Override public void onCreate(Bundle state) {
@@ -68,6 +70,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
         applyWindowInsets();
         search = findViewById(R.id.inputSearch);
         count = findViewById(R.id.txtCount);
+        borrowedKeys = findViewById(R.id.txtBorrowedKeys);
         adapter = new PeopleAdapter(this, filteredPeople, this);
         adapter.setToday(today());
         ((ListView) findViewById(R.id.listPeople)).setAdapter(adapter);
@@ -89,9 +92,9 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
         count.setText("Conectando con Firebase…");
         authentication = FirebaseAuth.getInstance();
         database = FirebaseFirestore.getInstance();
-        if (authentication.getCurrentUser() != null) listenForPeople();
+        if (authentication.getCurrentUser() != null) startListeners();
         else authentication.signInAnonymously()
-            .addOnSuccessListener(result -> listenForPeople())
+            .addOnSuccessListener(result -> startListeners())
             .addOnFailureListener(error -> showMessage("Sin acceso", "No se pudo iniciar Firebase: " + cleanError(error)));
     }
 
@@ -106,6 +109,11 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
             return insets;
         });
         root.requestApplyInsets();
+    }
+
+    private void startListeners() {
+        listenForPeople();
+        listenForBorrowedKeys();
     }
 
     private void listenForPeople() {
@@ -135,6 +143,22 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
             Collections.sort(hiddenPeople, byName);
             Collections.sort(removedPeople, byName);
             filterPeople(search.getText().toString());
+        });
+    }
+
+    private void listenForBorrowedKeys() {
+        keysListener = database.collection("llaves").addSnapshotListener((snapshot, error) -> {
+            if (error != null || snapshot == null) {
+                borrowedKeys.setText("Llaves prestadas: --");
+                return;
+            }
+            int borrowed = 0;
+            for (DocumentSnapshot document : snapshot.getDocuments()) {
+                Boolean active = document.getBoolean("activo");
+                if (active != null && !active) continue;
+                if ("Prestada".equals(document.getString("estado"))) borrowed++;
+            }
+            borrowedKeys.setText("Llaves prestadas: " + borrowed);
         });
     }
 
@@ -721,6 +745,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
 
     @Override protected void onDestroy() {
         if (peopleListener != null) peopleListener.remove();
+        if (keysListener != null) keysListener.remove();
         sheets.close();
         super.onDestroy();
     }

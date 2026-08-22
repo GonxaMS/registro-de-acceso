@@ -121,6 +121,17 @@
             android:textColor="#E7F0FF"
             android:textSize="16sp"
             android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/txtBorrowedKeys"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="68dp"
+            android:layout_marginTop="5dp"
+            android:text="Llaves prestadas: 0"
+            android:textColor="#FFD966"
+            android:textSize="15sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
     <LinearLayout
