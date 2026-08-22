@@ -27,7 +27,7 @@ La APK se genera en `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Copia a Google Sheets
 
-La aplicación usa un Apps Script como receptor. El script debe validar una clave de conexión, recibir el operario, fecha, hora y movimiento, y reflejarlo en las hojas `Personal` y `Registros`.
+La aplicación usa un Apps Script como receptor. El script debe validar una clave de conexión, recibir el operario, fecha, hora y movimiento, y reflejarlo en las hojas `Personal` y `Registros`. Para llaves, debe aceptar `accion=llave_movimiento` y registrar `llaveId`, `llave`, `movimiento`, `persona`, `fecha`, `hora` y `usuario` en una hoja de registros de llaves.
 
 No guardar en GitHub el enlace del despliegue, la clave ni el identificador de la planilla de producción. Usar variables privadas o una configuración local cuando el proyecto se comparta.
 

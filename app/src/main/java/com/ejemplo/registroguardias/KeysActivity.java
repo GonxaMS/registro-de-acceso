@@ -36,6 +36,7 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
     private final List<KeyItem> hiddenKeys = new ArrayList<>();
     private final List<KeyItem> filteredKeys = new ArrayList<>();
     private final List<SelectablePerson> selectablePeople = new ArrayList<>();
+    private final SheetsClient sheets = new SheetsClient();
 
     private FirebaseFirestore database;
     private ListenerRegistration keysListener;
@@ -253,10 +254,12 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
             transaction.set(metaReference,
                 Collections.singletonMap("siguienteMovimientoLlave", next + 1), SetOptions.merge());
             return movementId;
-        }).addOnSuccessListener(ignored -> showMessage("Registro correcto",
-            (take ? person + " retiro " : person + " devolvio ") + key.name
-                + " a las " + time + "."))
-            .addOnFailureListener(error -> showMessage("No se pudo registrar", cleanError(error)));
+        }).addOnSuccessListener(ignored -> {
+            showMessage("Registro correcto",
+                (take ? person + " retiro " : person + " devolvio ") + key.name
+                    + " a las " + time + ".");
+            sheets.mirrorKeyMovement(key, type, person, date, time, registeredBy);
+        }).addOnFailureListener(error -> showMessage("No se pudo registrar", cleanError(error)));
     }
 
     @Override public void onKeyOptions(View anchor, KeyItem key) {
@@ -435,6 +438,7 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
     @Override protected void onDestroy() {
         if (keysListener != null) keysListener.remove();
         if (peopleListener != null) peopleListener.remove();
+        sheets.close();
         super.onDestroy();
     }
 }

@@ -24,6 +24,20 @@ final class SheetsClient implements AutoCloseable {
         ));
     }
 
+    void mirrorKeyMovement(KeyItem key, String type, String person, String date, String time, String user) {
+        executor.execute(() -> post(
+            "clave=" + encode(KEY_VALUE)
+                + "&accion=" + encode("llave_movimiento")
+                + "&llaveId=" + encode(key.id)
+                + "&llave=" + encode(key.name)
+                + "&movimiento=" + encode(type)
+                + "&persona=" + encode(person)
+                + "&fecha=" + encode(date)
+                + "&hora=" + encode(time)
+                + "&usuario=" + encode(user)
+        ));
+    }
+
     void syncPerson(String action, Person person) {
         executor.execute(() -> get(
             URL_VALUE + "?clave=" + encode(KEY_VALUE)
