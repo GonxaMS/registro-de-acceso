@@ -18,6 +18,7 @@ Aplicación Android privada para registrar ingresos y salidas de operarios. Mant
 - [Uso diario](docs/OPERACION.md)
 - [Datos y seguridad](docs/DATOS_Y_SEGURIDAD.md)
 - [Instalación y despliegue](docs/INSTALACION_Y_DESPLIEGUE.md)
+- [Desarrollo local](docs/DESARROLLO_LOCAL.md)
 
 ## Abrir y compilar
 
