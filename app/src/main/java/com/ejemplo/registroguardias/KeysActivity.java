@@ -35,9 +35,11 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
     private final List<KeyItem> visibleKeys = new ArrayList<>();
     private final List<KeyItem> hiddenKeys = new ArrayList<>();
     private final List<KeyItem> filteredKeys = new ArrayList<>();
+    private final List<Person> activePeople = new ArrayList<>();
 
     private FirebaseFirestore database;
     private ListenerRegistration keysListener;
+    private ListenerRegistration peopleListener;
     private SharedPreferences preferences;
     private EditText search;
     private TextView count;
@@ -69,6 +71,7 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
         count.setText("Conectando con Firebase...");
         database = FirebaseFirestore.getInstance();
         listenForKeys();
+        listenForPeople();
     }
 
     private void applyWindowInsets() {
@@ -107,6 +110,23 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
         });
     }
 
+    private void listenForPeople() {
+        peopleListener = database.collection("personal").addSnapshotListener((snapshot, error) -> {
+            if (error != null || snapshot == null) return;
+            activePeople.clear();
+            for (DocumentSnapshot document : snapshot.getDocuments()) {
+                Boolean active = document.getBoolean("activo");
+                if (active != null && !active) continue;
+                activePeople.add(new Person(
+                    document.getId(), document.getString("nombre"), document.getString("estado"),
+                    document.getString("ultimoMovimiento"), document.getString("fecha")
+                ));
+            }
+            Collections.sort(activePeople, (left, right) ->
+                String.CASE_INSENSITIVE_ORDER.compare(left.name, right.name));
+        });
+    }
+
     private void filterKeys(String query) {
         filteredKeys.clear();
         String normalized = query.trim().toLowerCase(Locale.getDefault());
@@ -125,32 +145,61 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
     }
 
     @Override public void onKeyMovement(KeyItem key, String type) {
-        if ("Retiro".equals(type)) showPersonDialog(key, type, "Quien se lleva la llave", "Retirar");
-        else showPersonDialog(key, type, "Quien devuelve la llave", "Devolver");
+        showPersonSelector(key, type);
     }
 
-    private void showPersonDialog(KeyItem key, String type, String hint, String positive) {
-        String defaultValue = "Devolucion".equals(type) && !key.holder.isEmpty() ? key.holder : "";
-        EditText input = dialogInput(hint, defaultValue);
+    private void showPersonSelector(KeyItem key, String type) {
+        if (activePeople.isEmpty()) {
+            showMessage("Sin operarios", "Todavia no hay operarios activos para elegir.");
+            return;
+        }
+        boolean take = "Retiro".equals(type);
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        EditText input = dialogInput("Buscar operario", take ? "" : key.holder);
         input.setSelectAllOnFocus(true);
-        AlertDialog dialog = new AlertDialog.Builder(this)
-            .setTitle(("Retiro".equals(type) ? "Retirar " : "Devolver ") + key.name)
-            .setMessage("Usuario que registra: " + currentUser())
-            .setView(padded(input))
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton(positive, null)
-            .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            .setOnClickListener(view -> {
-                String person = cleanName(input.getText().toString());
-                if (person.length() < 2) {
-                    input.setError("Escribe un nombre");
-                    return;
+        ListView list = new ListView(this);
+        list.setDividerHeight(1);
+        List<Person> filtered = new ArrayList<>();
+        android.widget.ArrayAdapter<String> peopleAdapter =
+            new android.widget.ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
+        list.setAdapter(peopleAdapter);
+        Runnable refresh = () -> {
+            filtered.clear();
+            peopleAdapter.clear();
+            String query = input.getText().toString().trim().toLowerCase(Locale.getDefault());
+            for (Person person : activePeople) {
+                if (person.name.toLowerCase(Locale.getDefault()).contains(query)
+                    || person.id.toLowerCase(Locale.getDefault()).contains(query)) {
+                    filtered.add(person);
+                    peopleAdapter.add(person.name);
                 }
-                dialog.dismiss();
-                saveKeyMovement(key, type, person);
-            }));
+            }
+            peopleAdapter.notifyDataSetChanged();
+        };
+        input.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence text, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence text, int start, int before, int count) {
+                refresh.run();
+            }
+            @Override public void afterTextChanged(Editable text) {}
+        });
+        content.addView(input, new LinearLayout.LayoutParams(-1, -2));
+        content.addView(list, new LinearLayout.LayoutParams(-1, dp(320)));
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle((take ? "Quien retira " : "Quien devuelve ") + key.name)
+            .setMessage("Usuario que registra: " + currentUser())
+            .setView(padded(content))
+            .setNegativeButton("Cancelar", null)
+            .create();
+        list.setOnItemClickListener((parent, view, position, id) -> {
+            if (position < 0 || position >= filtered.size()) return;
+            String person = filtered.get(position).name;
+            dialog.dismiss();
+            saveKeyMovement(key, type, person);
+        });
         dialog.show();
+        refresh.run();
     }
 
     private void saveKeyMovement(KeyItem key, String type, String person) {
@@ -364,10 +413,14 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
 
     private LinearLayout padded(View content) {
         LinearLayout container = new LinearLayout(this);
-        int padding = (int) (20 * getResources().getDisplayMetrics().density + 0.5f);
+        int padding = dp(20);
         container.setPadding(padding, 0, padding, 0);
         container.addView(content, new LinearLayout.LayoutParams(-1, -2));
         return container;
+    }
+
+    private int dp(int value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
     private void showMessage(String title, String message) {
@@ -381,6 +434,7 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
 
     @Override protected void onDestroy() {
         if (keysListener != null) keysListener.remove();
+        if (peopleListener != null) peopleListener.remove();
         super.onDestroy();
     }
 }
