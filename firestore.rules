@@ -6,14 +6,15 @@ service cloud.firestore {
       allow create: if request.auth != null
         && id.matches('P[0-9]{4}')
         && request.resource.data.keys().hasOnly([
-          'nombre','estado','ultimoMovimiento','fecha','hora','actualizado','activo'
+          'nombre','estado','ultimoMovimiento','fecha','hora','actualizado','activo','retirado'
         ])
         && request.resource.data.nombre is string
         && request.resource.data.estado == 'Fuera'
-        && request.resource.data.activo == true;
+        && request.resource.data.activo == true
+        && request.resource.data.retirado == false;
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'estado','ultimoMovimiento','fecha','hora','actualizado','activo'
+          'estado','ultimoMovimiento','fecha','hora','actualizado','activo','retirado'
         ])
         && request.resource.data.estado in ['Dentro','Fuera'];
       allow delete: if false;

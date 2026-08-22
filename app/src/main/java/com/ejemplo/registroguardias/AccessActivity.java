@@ -41,6 +41,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
 
     private final List<Person> visiblePeople = new ArrayList<>();
     private final List<Person> hiddenPeople = new ArrayList<>();
+    private final List<Person> removedPeople = new ArrayList<>();
     private final List<Person> filteredPeople = new ArrayList<>();
     private final SheetsClient sheets = new SheetsClient();
 
@@ -107,19 +108,23 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
             if (snapshot == null) return;
             visiblePeople.clear();
             hiddenPeople.clear();
+            removedPeople.clear();
             for (DocumentSnapshot document : snapshot.getDocuments()) {
                 Person person = new Person(
                     document.getId(), document.getString("nombre"), document.getString("estado"),
                     document.getString("ultimoMovimiento"), document.getString("fecha")
                 );
                 Boolean active = document.getBoolean("activo");
-                if (active == null || active) visiblePeople.add(person);
+                Boolean removed = document.getBoolean("retirado");
+                if (removed != null && removed) removedPeople.add(person);
+                else if (active == null || active) visiblePeople.add(person);
                 else hiddenPeople.add(person);
             }
             Comparator<Person> byName = (left, right) ->
                 String.CASE_INSENSITIVE_ORDER.compare(left.name, right.name);
             Collections.sort(visiblePeople, byName);
             Collections.sort(hiddenPeople, byName);
+            Collections.sort(removedPeople, byName);
             filterPeople(search.getText().toString());
         });
     }
@@ -220,12 +225,14 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
         menu.getMenu().add("Modificar hora");
         menu.getMenu().add("Quitar ingreso de hoy");
         menu.getMenu().add("Quitar salida de hoy");
+        menu.getMenu().add("Quitar operario");
         menu.getMenu().add("Ocultar operario");
         menu.setOnMenuItemClickListener(item -> {
             String option = item.getTitle().toString();
             if (option.startsWith("Modificar")) loadTodayMovements(person);
             else if (option.startsWith("Quitar ingreso")) startCancellation(person, "Ingreso");
             else if (option.startsWith("Quitar salida")) startCancellation(person, "Salida");
+            else if (option.startsWith("Quitar operario")) confirmRemove(person);
             else confirmHide(person);
             return true;
         });
@@ -279,12 +286,20 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
     private void addPerson(String name) {
         for (Person person : hiddenPeople) {
             if (person.name.equalsIgnoreCase(name)) {
-                database.collection("personal").document(person.id).update("activo", true)
+                database.collection("personal").document(person.id).update("activo", true, "retirado", false)
                     .addOnSuccessListener(ignored -> {
                         toast(person.name + " volvió a la lista");
                         sheets.syncPerson("mostrar", person);
                     })
                     .addOnFailureListener(error -> showMessage("No se pudo mostrar", cleanError(error)));
+                return;
+            }
+        }
+
+        for (Person person : removedPeople) {
+            if (person.name.equalsIgnoreCase(name)) {
+                showMessage("Operario quitado",
+                    person.name + " fue quitado de la lista y no puede restaurarse desde la app.");
                 return;
             }
         }
@@ -302,6 +317,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
             data.put("fecha", "");
             data.put("hora", "");
             data.put("activo", true);
+            data.put("retirado", false);
             data.put("actualizado", FieldValue.serverTimestamp());
             transaction.set(database.collection("personal").document(id), data);
             transaction.set(metaReference, Collections.singletonMap("siguienteId", next + 1), SetOptions.merge());
@@ -322,7 +338,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
             .setMessage("¿Quieres ocultar a " + person.name + " de la lista?")
             .setNegativeButton("Cancelar", null)
             .setPositiveButton("Sí, ocultar", (dialog, which) ->
-                database.collection("personal").document(person.id).update("activo", false)
+                database.collection("personal").document(person.id).update("activo", false, "retirado", false)
                     .addOnSuccessListener(ignored -> {
                         toast("Operario oculto");
                         sheets.syncPerson("ocultar", person);
@@ -342,7 +358,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
             .setTitle("Mostrar operarios ocultos")
             .setItems(names, (dialog, index) -> {
                 Person person = hiddenPeople.get(index);
-                database.collection("personal").document(person.id).update("activo", true)
+                database.collection("personal").document(person.id).update("activo", true, "retirado", false)
                     .addOnSuccessListener(ignored -> {
                         toast(person.name + " volvió a la lista");
                         sheets.syncPerson("mostrar", person);
@@ -350,6 +366,24 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
                     .addOnFailureListener(error -> showMessage("No se pudo mostrar", cleanError(error)));
             })
             .setNegativeButton("Cancelar", null)
+            .show();
+    }
+
+    private void confirmRemove(Person person) {
+        if ("Dentro".equals(person.state)) {
+            showMessage("No se puede quitar", "Primero debes registrar la salida de " + person.name);
+            return;
+        }
+        new AlertDialog.Builder(this)
+            .setTitle("Quitar operario")
+            .setMessage("Quieres quitar a " + person.name
+                + " de la lista? No se borra de Firebase ni se pierde su historial, pero no podra restaurarse desde la app.")
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Si, quitar", (dialog, which) ->
+                database.collection("personal").document(person.id)
+                    .update("activo", false, "retirado", true, "actualizado", FieldValue.serverTimestamp())
+                    .addOnSuccessListener(ignored -> toast("Operario quitado"))
+                    .addOnFailureListener(error -> showMessage("No se pudo quitar", cleanError(error))))
             .show();
     }
 

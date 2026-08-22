@@ -115,6 +115,8 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
             if (error != null || snapshot == null) return;
             selectablePeople.clear();
             for (DocumentSnapshot document : snapshot.getDocuments()) {
+                Boolean removed = document.getBoolean("retirado");
+                if (removed != null && removed) continue;
                 Boolean active = document.getBoolean("activo");
                 selectablePeople.add(new SelectablePerson(
                     document.getId(), document.getString("nombre"), active != null && !active
