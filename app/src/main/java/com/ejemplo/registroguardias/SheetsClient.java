@@ -1,5 +1,6 @@
 package com.ejemplo.registroguardias;
 
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -61,15 +62,13 @@ final class SheetsClient implements AutoCloseable {
     private static void post(String body) {
         HttpURLConnection connection = null;
         try {
-            connection = (HttpURLConnection) new URL(URL_VALUE).openConnection();
+            connection = open(URL_VALUE);
             connection.setRequestMethod("POST");
-            connection.setConnectTimeout(12000);
-            connection.setReadTimeout(12000);
             connection.setDoOutput(true);
             try (OutputStream output = connection.getOutputStream()) {
                 output.write(body.getBytes(StandardCharsets.UTF_8));
             }
-            connection.getResponseCode();
+            finish(connection);
         } catch (Exception ignored) {
             // Firebase es la fuente principal; Sheets es una copia secundaria.
         } finally {
@@ -80,14 +79,59 @@ final class SheetsClient implements AutoCloseable {
     private static void get(String address) {
         HttpURLConnection connection = null;
         try {
-            connection = (HttpURLConnection) new URL(address).openConnection();
-            connection.setConnectTimeout(12000);
-            connection.setReadTimeout(12000);
-            connection.getResponseCode();
+            String current = address;
+            for (int redirects = 0; redirects < 4; redirects++) {
+                connection = open(current);
+                connection.setRequestMethod("GET");
+                int code = connection.getResponseCode();
+                if (code != HttpURLConnection.HTTP_MOVED_TEMP
+                    && code != HttpURLConnection.HTTP_MOVED_PERM
+                    && code != HttpURLConnection.HTTP_SEE_OTHER) {
+                    drain(connection);
+                    return;
+                }
+                String location = connection.getHeaderField("Location");
+                connection.disconnect();
+                connection = null;
+                if (location == null || location.trim().isEmpty()) return;
+                current = location;
+            }
         } catch (Exception ignored) {
             // Firebase es la fuente principal; Sheets es una copia secundaria.
         } finally {
             if (connection != null) connection.disconnect();
+        }
+    }
+
+    private static HttpURLConnection open(String address) throws Exception {
+        HttpURLConnection connection = (HttpURLConnection) new URL(address).openConnection();
+        connection.setInstanceFollowRedirects(false);
+        connection.setConnectTimeout(12000);
+        connection.setReadTimeout(12000);
+        return connection;
+    }
+
+    private static void finish(HttpURLConnection connection) throws Exception {
+        int code = connection.getResponseCode();
+        if (code == HttpURLConnection.HTTP_MOVED_TEMP
+            || code == HttpURLConnection.HTTP_MOVED_PERM
+            || code == HttpURLConnection.HTTP_SEE_OTHER) {
+            String location = connection.getHeaderField("Location");
+            connection.disconnect();
+            if (location != null && !location.trim().isEmpty()) get(location);
+            return;
+        }
+        drain(connection);
+    }
+
+    private static void drain(HttpURLConnection connection) throws Exception {
+        InputStream stream = connection.getResponseCode() >= 400
+            ? connection.getErrorStream()
+            : connection.getInputStream();
+        if (stream == null) return;
+        byte[] buffer = new byte[256];
+        try (InputStream input = stream) {
+            while (input.read(buffer) != -1) {}
         }
     }
 
