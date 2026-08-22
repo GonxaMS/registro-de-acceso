@@ -31,6 +31,30 @@ jobs:
           fi
           printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
 
+      - name: Add Firebase client for Llaves package
+        run: |
+          python3 - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+
+          path = Path("app/google-services.json")
+          data = json.loads(path.read_text())
+          clients = data.get("client", [])
+          target = "com.ejemplo.registroguardias.llaves"
+          if clients and not any(
+              client.get("client_info", {})
+                  .get("android_client_info", {})
+                  .get("package_name") == target
+              for client in clients
+          ):
+              cloned = copy.deepcopy(clients[0])
+              cloned.setdefault("client_info", {}).setdefault("android_client_info", {})["package_name"] = target
+              clients.append(cloned)
+              data["client"] = clients
+              path.write_text(json.dumps(data, indent=2))
+          PY
+
       - name: Build debug APK
         run: ./gradlew assembleDebug
 
