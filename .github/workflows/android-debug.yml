@@ -58,7 +58,7 @@ jobs:
       - name: Create Sheets config
         run: |
           {
-            echo 'sheets.url=https://script.google.com/macros/s/AKfycbyerApHKgpzWBr0fqZBXX0k_N6aoAyvHUsVatbtQU-H699ET8p2mckCrxlqUgxUW7If/exec'
+            echo 'sheets.url=https://script.google.com/macros/s/AKfycbyEcfMveAJ0ShLMuV3-iLPc_8EEhWOqH-tXUAnDX4xKAuAKU2pzpIGsjVThCi52oJ-H/exec'
             echo 'sheets.key='
           } > local.properties
 

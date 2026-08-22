@@ -1,22 +1,37 @@
-const SPREADSHEET_ID = "1qi3_vRZ4_HQnN0mlOUSrvjVgn53B7Xkr4BvQ";
+const SPREADSHEET_ID = "1qh4aP9Hot-tAO5i7fEfzNTqQ2YK71xFkwgrm7uuDIcw";
 const ZONA_HORARIA = "America/Argentina/Mendoza";
+
+function doGet(e) {
+  try {
+    var datos = obtenerDatos_(e);
+    if (!datos.accion && !datos.id && !datos.movimiento) {
+      return responder_({ ok: true, mensaje: "API Registro Guardia activa" });
+    }
+    return procesarRegistro_(datos);
+  } catch (error) {
+    return responder_({ ok: false, mensaje: error.message });
+  }
+}
 
 function doPost(e) {
   try {
-    var libro = SpreadsheetApp.openById(SPREADSHEET_ID);
-    var datos = obtenerDatos_(e);
-
-    if (String(datos.accion || "") === "llave_movimiento") {
-      return registrarMovimientoLlave_(libro, datos);
-    }
-
-    return registrarMovimientoPersonal_(libro, datos);
+    return procesarRegistro_(obtenerDatos_(e));
   } catch (error) {
     return responder_({
       ok: false,
       mensaje: error.message
     });
   }
+}
+
+function procesarRegistro_(datos) {
+  var libro = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  if (String(datos.accion || "") === "llave_movimiento") {
+    return registrarMovimientoLlave_(libro, datos);
+  }
+
+  return registrarMovimientoPersonal_(libro, datos);
 }
 
 function registrarMovimientoPersonal_(libro, datos) {
