@@ -31,7 +31,10 @@ function procesarRegistro_(datos) {
     return registrarMovimientoLlave_(libro, datos);
   }
 
-  return registrarMovimientoPersonal_(libro, datos);
+  return responder_({
+    ok: true,
+    mensaje: "Movimiento de personal ignorado en Sheets"
+  });
 }
 
 function registrarMovimientoPersonal_(libro, datos) {
