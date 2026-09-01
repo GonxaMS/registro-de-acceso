@@ -85,7 +85,7 @@
                 android:contentDescription="@string/open_sheets"
                 android:focusable="true"
                 android:gravity="center"
-                android:text="📊 Sheets"
+                android:text="📋 Planilla"
                 android:textColor="@color/white"
                 android:textSize="16sp"
                 android:textStyle="bold" />

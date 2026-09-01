@@ -1,9 +1,70 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /personal/{id} {
-      allow read: if request.auth != null;
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/administradores/$(request.auth.uid))
+        && get(/databases/$(database)/documents/administradores/$(request.auth.uid)).data.activo == true;
+    }
+
+    function isService() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/servicios/$(request.auth.uid))
+        && get(/databases/$(database)/documents/servicios/$(request.auth.uid)).data.activo == true;
+    }
+
+    function hasAccess() {
+      return isAdmin()
+        || (request.auth != null
+          && exists(/databases/$(database)/documents/dispositivos/$(request.auth.uid))
+          && get(/databases/$(database)/documents/dispositivos/$(request.auth.uid)).data.estado == 'Normal');
+    }
+
+    match /administradores/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || isAdmin());
+      allow create, update: if isAdmin()
+        && request.auth.uid != uid
+        && request.resource.data.keys().hasOnly(['activo','nombre','actualizado'])
+        && request.resource.data.activo is bool
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() <= 80
+        && request.resource.data.actualizado is timestamp;
+      allow delete: if false;
+    }
+
+    match /dispositivos/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || isAdmin());
       allow create: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['nombre','estado','actualizado'])
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() >= 2
+        && request.resource.data.nombre.size() <= 80
+        && request.resource.data.estado == 'Bloqueado'
+        && request.resource.data.actualizado is timestamp;
+      allow update: if (request.auth != null
+          && request.auth.uid == uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nombre','actualizado'])
+          && request.resource.data.nombre is string
+          && request.resource.data.nombre.size() >= 2
+          && request.resource.data.nombre.size() <= 80
+          && request.resource.data.actualizado is timestamp)
+        || (isAdmin()
+          && request.auth.uid != uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado','actualizado'])
+          && request.resource.data.estado in ['Normal','Bloqueado']
+          && request.resource.data.actualizado is timestamp);
+      allow delete: if false;
+    }
+
+    match /servicios/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /personal/{id} {
+      allow read: if hasAccess() || isService();
+      allow create: if hasAccess()
         && id.matches('P[0-9]{4}')
         && request.resource.data.keys().hasOnly([
           'nombre','estado','ultimoMovimiento','fecha','hora','actualizado','activo','retirado'
@@ -12,7 +73,7 @@ service cloud.firestore {
         && request.resource.data.estado == 'Fuera'
         && request.resource.data.activo == true
         && request.resource.data.retirado == false;
-      allow update: if request.auth != null
+      allow update: if hasAccess()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'estado','ultimoMovimiento','fecha','hora','actualizado','activo','retirado'
         ])
@@ -54,45 +115,113 @@ service cloud.firestore {
             || (request.resource.data.movimiento == 'AnulacionSalida'
             && get(/databases/$(database)/documents/movimientos/$(request.resource.data.anulaA)).data.movimiento == 'Salida'));
       }
-      allow read: if request.auth != null;
-      allow create: if request.auth != null
+      allow read: if hasAccess() || isService();
+      allow create: if hasAccess()
         && request.resource.data.keys().hasOnly([
           'movimientoId','personalId','nombre','movimiento','fecha','hora',
-          'creado','usuario','esCorreccion','reemplazaA','anulaA'
+          'creado','usuario','esAjusteAdmin','esCorreccion','reemplazaA','anulaA'
         ])
         && id.matches('M[0-9]{6}')
         && request.resource.data.movimientoId == id
         && request.resource.data.personalId.matches('P[0-9]{4}')
         && validUser()
-        && ((request.resource.data.movimiento in ['Ingreso','Salida']
+        && ((!request.resource.data.keys().hasAny(['esCorreccion','reemplazaA','anulaA','esAjusteAdmin'])
+          && request.resource.data.movimiento in ['Ingreso','Salida'])
+          || (!request.resource.data.keys().hasAny(['esAjusteAdmin','esCorreccion','reemplazaA'])
+            && request.resource.data.movimiento in ['AnulacionIngreso','AnulacionSalida']
+            && validCancellation())
+          || (!request.resource.data.keys().hasAny(['esAjusteAdmin','anulaA'])
+            && request.resource.data.movimiento in ['Ingreso','Salida']
+            && request.resource.data.esCorreccion == true
+            && request.resource.data.reemplazaA is string
+            && get(/databases/$(database)/documents/personal/$(request.resource.data.personalId)).data.fecha
+              == request.resource.data.fecha
+            && validCorrection())
+          || (isAdmin()
+            && request.resource.data.esAjusteAdmin == true
+            && ((request.resource.data.movimiento in ['Ingreso','Salida']
           && !request.resource.data.keys().hasAny(['anulaA'])
           && validCorrection())
           || (request.resource.data.movimiento in ['AnulacionIngreso','AnulacionSalida']
           && !request.resource.data.keys().hasAny(['esCorreccion','reemplazaA'])
-          && validCancellation()));
+          && validCancellation()))));
       allow update, delete: if false;
     }
 
     match /llaves/{id} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null
+      function validKeyMovementAfter() {
+        return request.resource.data.ultimoMovimientoId is string
+          && request.resource.data.ultimoMovimientoId.matches('L[0-9]{6}')
+          && existsAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId))
+          && getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.llaveId == id
+          && getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.llaveNombre == resource.data.nombre
+          && getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.fecha == request.resource.data.ultimaFecha
+          && getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.hora == request.resource.data.ultimaHora;
+      }
+      function validLoan() {
+        return resource.data.estado == 'Disponible'
+          && request.resource.data.estado == 'Prestada'
+          && request.resource.data.quienTiene is string
+          && request.resource.data.quienTiene.size() >= 2
+          && request.resource.data.quienTiene.size() <= 120
+          && (request.resource.data.quienTieneId == ''
+            || request.resource.data.quienTieneId.matches('P[0-9]{4}'))
+          && request.resource.data.fechaRetiro == request.resource.data.ultimaFecha
+          && request.resource.data.horaRetiro == request.resource.data.ultimaHora
+          && request.resource.data.ultimoMovimiento == 'Retiro'
+          && getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.movimiento == 'Retiro'
+          && getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.personaId == request.resource.data.quienTieneId
+          && getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.persona == request.resource.data.quienTiene;
+      }
+      function validReturn() {
+        return resource.data.estado == 'Prestada'
+          && request.resource.data.estado == 'Disponible'
+          && request.resource.data.quienTiene == ''
+          && request.resource.data.quienTieneId == ''
+          && request.resource.data.fechaRetiro == ''
+          && request.resource.data.horaRetiro == ''
+          && request.resource.data.ultimoMovimiento == 'Devolucion'
+          && getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.movimiento == 'Devolucion';
+      }
+      allow read: if hasAccess() || isService();
+      allow create: if hasAccess()
         && id.matches('K[0-9]{4}')
         && request.resource.data.keys().hasOnly([
-          'nombre','estado','quienTiene','fechaRetiro','horaRetiro',
-          'ultimoMovimiento','ultimaFecha','ultimaHora','actualizado','activo'
+          'nombre','estado','quienTiene','quienTieneId','fechaRetiro','horaRetiro',
+          'ultimoMovimiento','ultimoMovimientoId','ultimaFecha','ultimaHora','actualizado','activo'
         ])
         && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() >= 1
+        && request.resource.data.nombre.size() <= 120
         && request.resource.data.estado == 'Disponible'
+        && request.resource.data.quienTiene == ''
+        && request.resource.data.quienTieneId == ''
+        && request.resource.data.ultimoMovimientoId == ''
         && request.resource.data.activo == true;
-      allow update: if request.auth != null
+      allow update: if hasAccess()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'estado','quienTiene','fechaRetiro','horaRetiro',
-          'ultimoMovimiento','ultimaFecha','ultimaHora','actualizado','activo'
+          'estado','quienTiene','quienTieneId','fechaRetiro','horaRetiro',
+          'ultimoMovimiento','ultimoMovimientoId','ultimaFecha','ultimaHora','actualizado','activo'
         ])
-        && request.resource.data.estado in ['Disponible','Prestada'];
+        && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activo'])
+            && resource.data.estado == 'Disponible')
+          || (validKeyMovementAfter() && (validLoan() || validReturn())));
       allow delete: if false;
     }
 
+    match /operariosLlaves/{id} {
+      allow read: if hasAccess() || isService();
+      allow create: if hasAccess()
+        && id.matches('E[0-9a-f]{24}')
+        && request.resource.data.keys().hasOnly(['nombre','actualizado'])
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() >= 3
+        && request.resource.data.nombre.size() <= 120;
+      allow update: if hasAccess()
+        && request.resource.data.nombre == resource.data.nombre
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['actualizado']);
+      allow delete: if false;
+    }
     match /movimientosLlaves/{id} {
       function validKeyUser() {
         return request.resource.data.usuario is string
@@ -102,37 +231,174 @@ service cloud.firestore {
       function validKeyPerson() {
         return request.resource.data.persona is string
           && request.resource.data.persona.size() >= 2
-          && request.resource.data.persona.size() <= 80;
+          && request.resource.data.persona.size() <= 120
+          && (request.resource.data.personaId == ''
+            || (request.resource.data.personaId.matches('P[0-9]{4}')
+              && exists(/databases/$(database)/documents/personal/$(request.resource.data.personaId))
+              && request.resource.data.persona
+                == get(/databases/$(database)/documents/personal/$(request.resource.data.personaId)).data.nombre
+              && (!get(/databases/$(database)/documents/personal/$(request.resource.data.personaId)).data.keys().hasAny(['retirado'])
+                || get(/databases/$(database)/documents/personal/$(request.resource.data.personaId)).data.retirado == false)));
+      }
+      function validKeyReference() {
+        return exists(/databases/$(database)/documents/llaves/$(request.resource.data.llaveId))
+          && request.resource.data.llaveNombre
+            == get(/databases/$(database)/documents/llaves/$(request.resource.data.llaveId)).data.nombre
+          && getAfter(/databases/$(database)/documents/llaves/$(request.resource.data.llaveId)).data.ultimoMovimientoId == id;
       }
       function validTake() {
         return request.resource.data.movimiento == 'Retiro'
+          && request.resource.data.quienRetiraId == request.resource.data.personaId
           && request.resource.data.quienRetira == request.resource.data.persona
-          && !request.resource.data.keys().hasAny(['quienDevuelve']);
+          && !request.resource.data.keys().hasAny(['quienDevuelveId','quienDevuelve']);
       }
       function validReturn() {
         return request.resource.data.movimiento == 'Devolucion'
+          && request.resource.data.quienDevuelveId == request.resource.data.personaId
           && request.resource.data.quienDevuelve == request.resource.data.persona
-          && !request.resource.data.keys().hasAny(['quienRetira']);
+          && !request.resource.data.keys().hasAny(['quienRetiraId','quienRetira']);
       }
-      allow read: if request.auth != null;
-      allow create: if request.auth != null
+      function validAdminCorrection() {
+        return request.resource.data.esAjusteAdmin == true
+          && request.resource.data.movimiento in ['Retiro','Devolucion']
+          && ((!request.resource.data.keys().hasAny(['esCorreccion','reemplazaA','anulaA']))
+            || (request.resource.data.esCorreccion == true
+              && request.resource.data.reemplazaA is string
+              && request.resource.data.reemplazaA.matches('L[0-9]{6}')
+              && request.resource.data.reemplazaA != id
+              && !request.resource.data.keys().hasAny(['anulaA'])
+              && exists(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.reemplazaA))
+              && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.reemplazaA)).data.llaveId
+                == request.resource.data.llaveId
+              && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.reemplazaA)).data.fecha
+                == request.resource.data.fecha
+              && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.reemplazaA)).data.movimiento
+                == request.resource.data.movimiento));
+      }
+      function validAdminCancellation() {
+        return request.resource.data.esAjusteAdmin == true
+          && !request.resource.data.keys().hasAny(['esCorreccion','reemplazaA'])
+          && request.resource.data.anulaA is string
+          && request.resource.data.anulaA.matches('L[0-9]{6}')
+          && request.resource.data.anulaA != id
+          && exists(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.anulaA))
+          && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.anulaA)).data.llaveId
+            == request.resource.data.llaveId
+          && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.anulaA)).data.fecha
+            == request.resource.data.fecha
+          && ((request.resource.data.movimiento == 'AnulacionRetiro'
+              && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.anulaA)).data.movimiento == 'Retiro')
+            || (request.resource.data.movimiento == 'AnulacionDevolucion'
+              && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.anulaA)).data.movimiento == 'Devolucion'));
+      }
+      allow read: if hasAccess() || isService();
+      allow create: if hasAccess()
         && id.matches('L[0-9]{6}')
         && request.resource.data.keys().hasOnly([
-          'movimientoId','llaveId','llaveNombre','movimiento','persona',
-          'quienRetira','quienDevuelve','fecha','hora','usuario','creado'
+          'movimientoId','llaveId','llaveNombre','movimiento','personaId','persona',
+          'quienRetiraId','quienRetira','quienDevuelveId','quienDevuelve',
+          'fecha','hora','usuario','creado','esAjusteAdmin','esCorreccion','reemplazaA','anulaA'
         ])
         && request.resource.data.movimientoId == id
         && request.resource.data.llaveId.matches('K[0-9]{4}')
         && request.resource.data.llaveNombre is string
-        && validKeyPerson()
+        && request.resource.data.fecha is string
+        && request.resource.data.hora.matches('[0-2][0-9]:[0-5][0-9]')
         && validKeyUser()
-        && (validTake() || validReturn());
+        && validKeyPerson()
+        && ((validKeyReference()
+            && !request.resource.data.keys().hasAny(['esAjusteAdmin','esCorreccion','reemplazaA','anulaA'])
+            && (validTake() || validReturn()))
+          || (isAdmin() && validAdminCorrection() && (validTake() || validReturn()))
+          || (isAdmin() && validAdminCancellation()));
       allow update, delete: if false;
     }
 
+    match /sincronizacion/{id} {
+      allow read: if (isAdmin() || isService()) && id == 'sheets';
+      allow create, update: if isService()
+        && id == 'sheets'
+        && request.resource.data.keys().hasOnly([
+          'estado','ultimaEjecucion','ultimoError','copiadosPersonal','copiadosLlaves'
+        ])
+        && request.resource.data.estado in ['Correcto','Error']
+        && request.resource.data.ultimaEjecucion is timestamp
+        && request.resource.data.ultimoError is string
+        && request.resource.data.copiadosPersonal is int
+        && request.resource.data.copiadosLlaves is int;
+      allow delete: if false;
+    }
+
+    match /erroresSincronizacion/{id} {
+      allow read: if isAdmin() || isService();
+      allow create: if isService()
+        && id.matches('E[0-9]+_[0-9]+')
+        && request.resource.data.keys().hasOnly([
+          'origen','mensaje','ocurrido','resuelto'
+        ])
+        && request.resource.data.origen is string
+        && request.resource.data.mensaje is string
+        && request.resource.data.ocurrido is timestamp
+        && request.resource.data.resuelto == false;
+      allow update: if (isService() || isAdmin())
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resuelto'])
+        && request.resource.data.resuelto == true;
+      allow delete: if false;
+    }
+
+    match /erroresApp/{id} {
+      allow read: if isAdmin();
+      allow create: if hasAccess()
+        && id.matches('E[0-9]+_[0-9]+')
+        && request.resource.data.keys().hasOnly([
+          'origen','mensaje','ocurrido','resuelto'
+        ])
+        && request.resource.data.origen is string
+        && request.resource.data.origen.matches('App Android.*')
+        && request.resource.data.origen.size() <= 100
+        && request.resource.data.mensaje is string
+        && request.resource.data.mensaje.size() >= 1
+        && request.resource.data.mensaje.size() <= 500
+        && request.resource.data.ocurrido == request.time
+        && request.resource.data.resuelto == false;
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resuelto'])
+        && request.resource.data.resuelto == true;
+      allow delete: if false;
+    }
+
+    match /comandosAdmin/{id} {
+      allow read: if (isAdmin() || isService()) && id == 'rehacerPlanillas';
+      allow create: if isAdmin()
+        && id == 'rehacerPlanillas'
+        && request.resource.data.keys().hasOnly([
+          'estado','fechaMes','solicitadoPor','solicitado','completado','resultado','error'
+        ])
+        && request.resource.data.estado == 'Pendiente'
+        && request.resource.data.fechaMes is string
+        && request.resource.data.solicitadoPor is string
+        && request.resource.data.solicitado is timestamp;
+      allow update: if (isAdmin() || isService())
+        && id == 'rehacerPlanillas'
+        && request.resource.data.keys().hasOnly([
+          'estado','fechaMes','solicitadoPor','solicitado','completado','resultado','error'
+        ])
+        && request.resource.data.estado in ['Pendiente','Procesando','Completado','Error']
+        && request.resource.data.fechaMes is string
+        && request.resource.data.solicitadoPor is string
+        && request.resource.data.solicitado is timestamp
+        && (!request.resource.data.keys().hasAny(['completado'])
+          || request.resource.data.completado is timestamp)
+        && (!request.resource.data.keys().hasAny(['resultado'])
+          || request.resource.data.resultado is string)
+        && (!request.resource.data.keys().hasAny(['error'])
+          || request.resource.data.error is string);
+      allow delete: if false;
+    }
+
     match /meta/{id} {
-      allow read: if request.auth != null && id == 'config';
-      allow create, update: if request.auth != null && id == 'config'
+      allow read: if hasAccess() && id == 'config';
+      allow create, update: if hasAccess() && id == 'config'
         && request.resource.data.keys().hasOnly([
           'siguienteId','siguienteMovimiento','siguienteLlave','siguienteMovimientoLlave'
         ])

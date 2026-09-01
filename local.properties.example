@@ -1,4 +1,3 @@
 # Copiar como local.properties y completar con datos propios.
 # sdk.dir=C:\\Ruta\\al\\Android\\Sdk
-sheets.url=
-sheets.key=
+sheets.web_url=

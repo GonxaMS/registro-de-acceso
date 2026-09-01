@@ -20,50 +20,24 @@ jobs:
       - name: Restore Gradle cache
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Create Firebase config
+      - name: Create private configuration
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          SHEETS_WEB_URL: ${{ secrets.SHEETS_WEB_URL }}
         run: |
-          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
-            echo "Missing repository secret: GOOGLE_SERVICES_JSON"
-            echo "Add the content of app/google-services.json as a GitHub Actions secret."
-            exit 1
-          fi
+          for variable in GOOGLE_SERVICES_JSON SHEETS_WEB_URL; do
+            if [ -z "${!variable}" ]; then
+              echo "Missing repository secret: ${variable}"
+              exit 1
+            fi
+          done
           printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
-
-      - name: Add Firebase client for Llaves package
-        run: |
-          python3 - <<'PY'
-          import copy
-          import json
-          from pathlib import Path
-
-          path = Path("app/google-services.json")
-          data = json.loads(path.read_text())
-          clients = data.get("client", [])
-          target = "com.ejemplo.registroguardias.llaves"
-          if clients and not any(
-              client.get("client_info", {})
-                  .get("android_client_info", {})
-                  .get("package_name") == target
-              for client in clients
-          ):
-              cloned = copy.deepcopy(clients[0])
-              cloned.setdefault("client_info", {}).setdefault("android_client_info", {})["package_name"] = target
-              clients.append(cloned)
-              data["client"] = clients
-              path.write_text(json.dumps(data, indent=2))
-          PY
-
-      - name: Create Sheets config
-        run: |
           {
-            echo 'sheets.url=https://script.google.com/macros/s/AKfycbyEcfMveAJ0ShLMuV3-iLPc_8EEhWOqH-tXUAnDX4xKAuAKU2pzpIGsjVThCi52oJ-H/exec'
-            echo 'sheets.key='
+            printf 'sheets.web_url=%s\n' "$SHEETS_WEB_URL"
           } > local.properties
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug
+        run: ./gradlew --no-daemon assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

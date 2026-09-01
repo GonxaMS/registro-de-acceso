@@ -23,6 +23,8 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.SetOptions;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,17 +34,24 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 public final class KeysActivity extends Activity implements KeysAdapter.Actions {
     private final List<KeyItem> visibleKeys = new ArrayList<>();
     private final List<KeyItem> hiddenKeys = new ArrayList<>();
     private final List<KeyItem> filteredKeys = new ArrayList<>();
+    private final List<SelectablePerson> personalPeople = new ArrayList<>();
+    private final List<SelectablePerson> keyOnlyPeople = new ArrayList<>();
     private final List<SelectablePerson> selectablePeople = new ArrayList<>();
-    private final SheetsClient sheets = new SheetsClient();
 
     private FirebaseFirestore database;
     private ListenerRegistration keysListener;
     private ListenerRegistration peopleListener;
+    private ListenerRegistration keyPeopleListener;
+    private boolean loadErrorDialogVisible;
+    private final Set<String> retriedLoads = new HashSet<>();
+    private final Set<String> reportedLoads = new HashSet<>();
     private SharedPreferences preferences;
     private EditText search;
     private TextView count;
@@ -72,13 +81,25 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
             @Override public void afterTextChanged(Editable text) {}
         });
 
-        count.setText("Conectando con Firebase...");
+        count.setText("Cargando llaves…");
         database = FirebaseFirestore.getInstance();
-        listenForKeys();
-        listenForPeople();
+        AdminAccess.checkRole(database, (admin, role) -> {
+            if (AdminAccess.BLOCKED.equals(role)) {
+                startActivity(new Intent(this, BlockedActivity.class));
+                finish();
+                return;
+            }
+            listenForKeys();
+            listenForPeople();
+            listenForKeyOnlyPeople();
+        });
     }
 
     private void openSheets() {
+        if (BuildConfig.USE_FIREBASE_EMULATOR || AccessActivity.SHEETS_WEB_URL.trim().isEmpty()) {
+            toast("La planilla no está disponible");
+            return;
+        }
         startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(AccessActivity.SHEETS_WEB_URL)));
     }
 
@@ -92,9 +113,10 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
     }
 
     private void listenForKeys() {
+        if (keysListener != null) keysListener.remove();
         keysListener = database.collection("llaves").addSnapshotListener((snapshot, error) -> {
             if (error != null) {
-                showMessage("Error de Firebase", cleanError(error));
+                showLoadError("Llaves", "No se pudieron cargar las llaves", error, this::listenForKeys);
                 return;
             }
             if (snapshot == null) return;
@@ -119,28 +141,71 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
     }
 
     private void listenForPeople() {
+        if (peopleListener != null) peopleListener.remove();
         peopleListener = database.collection("personal").addSnapshotListener((snapshot, error) -> {
-            if (error != null || snapshot == null) return;
-            selectablePeople.clear();
+            if (error != null) {
+                showLoadError("Personal para llaves", "No se pudo cargar el personal", error,
+                    this::listenForPeople);
+                return;
+            }
+            if (snapshot == null) return;
+            personalPeople.clear();
             for (DocumentSnapshot document : snapshot.getDocuments()) {
                 Boolean removed = document.getBoolean("retirado");
                 if (removed != null && removed) continue;
                 Boolean active = document.getBoolean("activo");
-                selectablePeople.add(new SelectablePerson(
+                personalPeople.add(new SelectablePerson(
                     document.getId(), document.getString("nombre"), active != null && !active
                 ));
             }
-            Collections.sort(selectablePeople, (left, right) ->
-                String.CASE_INSENSITIVE_ORDER.compare(left.name, right.name));
+            rebuildSelectablePeople();
         });
+    }
+
+    private void listenForKeyOnlyPeople() {
+        if (keyPeopleListener != null) keyPeopleListener.remove();
+        keyPeopleListener = database.collection("operariosLlaves")
+            .addSnapshotListener((snapshot, error) -> {
+                if (error != null) {
+                    showLoadError("Operarios de llaves",
+                        "No se pudieron cargar los operarios de llaves", error,
+                        this::listenForKeyOnlyPeople);
+                    return;
+                }
+                if (snapshot == null) return;
+                keyOnlyPeople.clear();
+                for (DocumentSnapshot document : snapshot.getDocuments()) {
+                    String name = document.getString("nombre");
+                    if (name != null && !name.trim().isEmpty()) {
+                        keyOnlyPeople.add(new SelectablePerson("", name, false, true));
+                    }
+                }
+                rebuildSelectablePeople();
+            });
+    }
+
+    private void rebuildSelectablePeople() {
+        selectablePeople.clear();
+        selectablePeople.addAll(personalPeople);
+        for (SelectablePerson keyPerson : keyOnlyPeople) {
+            boolean duplicate = false;
+            for (SelectablePerson person : personalPeople) {
+                if (person.name.equalsIgnoreCase(keyPerson.name)) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (!duplicate) selectablePeople.add(keyPerson);
+        }
+        Collections.sort(selectablePeople, (left, right) ->
+            String.CASE_INSENSITIVE_ORDER.compare(left.name, right.name));
     }
 
     private void filterKeys(String query) {
         filteredKeys.clear();
         String normalized = query.trim().toLowerCase(Locale.getDefault());
         for (KeyItem key : visibleKeys) {
-            if (key.name.toLowerCase(Locale.getDefault()).contains(normalized)
-                || key.id.toLowerCase(Locale.getDefault()).contains(normalized)) {
+            if (key.name.toLowerCase(Locale.getDefault()).contains(normalized)) {
                 filteredKeys.add(key);
             }
         }
@@ -157,14 +222,10 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
     }
 
     private void showPersonSelector(KeyItem key, String type) {
-        if (selectablePeople.isEmpty()) {
-            showMessage("Sin operarios", "Todavia no hay operarios activos para elegir.");
-            return;
-        }
         boolean take = "Retiro".equals(type);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        EditText input = dialogInput("Buscar operario", take ? "" : key.holder);
+        EditText input = dialogInput("APELLIDO NOMBRE (ej. PÉREZ JUAN)", take ? "" : key.holder);
         input.setSelectAllOnFocus(true);
         ListView list = new ListView(this);
         list.setDividerHeight(1);
@@ -177,8 +238,7 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
             peopleAdapter.clear();
             String query = input.getText().toString().trim().toLowerCase(Locale.getDefault());
             for (SelectablePerson person : selectablePeople) {
-                if (person.name.toLowerCase(Locale.getDefault()).contains(query)
-                    || person.id.toLowerCase(Locale.getDefault()).contains(query)) {
+                if (person.name.toLowerCase(Locale.getDefault()).contains(query)) {
                     filtered.add(person);
                     peopleAdapter.add(person.label());
                 }
@@ -196,50 +256,83 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
         content.addView(list, new LinearLayout.LayoutParams(-1, dp(320)));
         AlertDialog dialog = new AlertDialog.Builder(this)
             .setTitle((take ? "Quien retira " : "Quien devuelve ") + key.name)
-            .setMessage("Usuario que registra: " + currentUser())
+            .setMessage("Elige de la lista o escribe APELLIDO primero y NOMBRE después.")
             .setView(padded(content))
             .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Usar nombre escrito", null)
             .create();
         list.setOnItemClickListener((parent, view, position, id) -> {
             if (position < 0 || position >= filtered.size()) return;
-            String person = filtered.get(position).name;
+            SelectablePerson person = filtered.get(position);
             dialog.dismiss();
             saveKeyMovement(key, type, person);
         });
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            .setOnClickListener(view -> {
+                String writtenName = keyPersonName(input.getText().toString());
+                if (writtenName.length() < 2) {
+                    input.setError("Escribe apellido y nombre");
+                    return;
+                }
+                if (!writtenName.contains(" ")) {
+                    input.setError("Escribe APELLIDO primero y NOMBRE después");
+                    return;
+                }
+                if (writtenName.length() > 120) {
+                    input.setError("El nombre es demasiado largo");
+                    return;
+                }
+                SelectablePerson chosen = null;
+                for (SelectablePerson person : selectablePeople) {
+                    if (person.name.equalsIgnoreCase(writtenName)) {
+                        chosen = person;
+                        break;
+                    }
+                }
+                if (chosen == null) chosen = new SelectablePerson("", writtenName, false, true);
+                dialog.dismiss();
+                saveKeyMovement(key, type, chosen);
+            }));
         dialog.show();
         refresh.run();
     }
 
-    private void saveKeyMovement(KeyItem key, String type, String person) {
+    private void saveKeyMovement(KeyItem key, String type, SelectablePerson person) {
         boolean take = "Retiro".equals(type);
         String date = today();
         String time = currentTime();
         String registeredBy = currentUser();
         DocumentReference keyReference = database.collection("llaves").document(key.id);
         DocumentReference metaReference = database.collection("meta").document("config");
+        DocumentReference keyPersonReference = person.id.isEmpty()
+            ? database.collection("operariosLlaves").document(keyPersonId(person.name)) : null;
         toast(take ? "Registrando retiro..." : "Registrando devolucion...");
 
         database.runTransaction(transaction -> {
             DocumentSnapshot current = transaction.get(keyReference);
             String state = current.getString("estado");
             if (take && "Prestada".equals(state)) {
-                throw new IllegalStateException("La llave ya esta prestada a " + current.getString("quienTiene"));
+                throw new IllegalStateException("La llave ya está prestada a " + current.getString("quienTiene"));
             }
             if (!take && !"Prestada".equals(state)) {
                 throw new IllegalStateException("La llave ya esta disponible");
             }
 
             DocumentSnapshot config = transaction.get(metaReference);
+            DocumentSnapshot storedKeyPerson = keyPersonReference == null
+                ? null : transaction.get(keyPersonReference);
             long next = nextNumber(config, "siguienteMovimientoLlave");
             String movementId = String.format(Locale.US, "L%06d", next);
             DocumentReference movementReference = database.collection("movimientosLlaves").document(movementId);
 
             Map<String, Object> keyUpdate = new HashMap<>();
             keyUpdate.put("estado", take ? "Prestada" : "Disponible");
-            keyUpdate.put("quienTiene", take ? person : "");
+            keyUpdate.put("quienTiene", take ? person.name : "");
+            keyUpdate.put("quienTieneId", take ? person.id : "");
             keyUpdate.put("fechaRetiro", take ? date : "");
             keyUpdate.put("horaRetiro", take ? time : "");
             keyUpdate.put("ultimoMovimiento", type);
+            keyUpdate.put("ultimoMovimientoId", movementId);
             keyUpdate.put("ultimaFecha", date);
             keyUpdate.put("ultimaHora", time);
             keyUpdate.put("actualizado", FieldValue.serverTimestamp());
@@ -250,24 +343,37 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
             movement.put("llaveId", key.id);
             movement.put("llaveNombre", key.name);
             movement.put("movimiento", type);
-            movement.put("persona", person);
-            if (take) movement.put("quienRetira", person);
-            else movement.put("quienDevuelve", person);
+            movement.put("personaId", person.id);
+            movement.put("persona", person.name);
+            if (take) {
+                movement.put("quienRetiraId", person.id);
+                movement.put("quienRetira", person.name);
+            } else {
+                movement.put("quienDevuelveId", person.id);
+                movement.put("quienDevuelve", person.name);
+            }
             movement.put("fecha", date);
             movement.put("hora", time);
             movement.put("usuario", registeredBy);
             movement.put("creado", FieldValue.serverTimestamp());
             transaction.set(movementReference, movement);
+            if (keyPersonReference != null) {
+                if (storedKeyPerson != null && storedKeyPerson.exists()) {
+                    transaction.update(keyPersonReference, "actualizado", FieldValue.serverTimestamp());
+                } else {
+                    Map<String, Object> keyPerson = new HashMap<>();
+                    keyPerson.put("nombre", person.name);
+                    keyPerson.put("actualizado", FieldValue.serverTimestamp());
+                    transaction.set(keyPersonReference, keyPerson);
+                }
+            }
             transaction.set(metaReference,
                 Collections.singletonMap("siguienteMovimientoLlave", next + 1), SetOptions.merge());
             return movementId;
-        }).addOnSuccessListener(ignored -> {
-            showMessage("Registro correcto",
-                (take ? person + " retiro " : person + " devolvio ") + key.name
-                    + " a las " + time + ".");
-            sheets.mirrorKeyMovement(key, type, person, date, time, registeredBy, (ok, message) ->
-                runOnUiThread(() -> toast(ok ? "Sheets actualizado" : "Error Sheets: " + message)));
-        }).addOnFailureListener(error -> showMessage("No se pudo registrar", cleanError(error)));
+        }).addOnSuccessListener(movementId ->
+            toast((take ? person.name + " retiró " : person.name + " devolvió ") + key.name
+                + " a las " + time))
+            .addOnFailureListener(error -> showMessage("No se pudo registrar", friendlyError(error)));
     }
 
     @Override public void onKeyOptions(View anchor, KeyItem key) {
@@ -305,7 +411,7 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
             .setOnClickListener(view -> {
                 String name = cleanName(input.getText().toString());
                 if (name.isEmpty()) {
-                    input.setError("Escribe un nombre");
+                    input.setError("Escribe apellido y nombre");
                     return;
                 }
                 for (KeyItem key : visibleKeys) {
@@ -325,7 +431,7 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
             if (key.name.equalsIgnoreCase(name)) {
                 database.collection("llaves").document(key.id).update("activo", true)
                     .addOnSuccessListener(ignored -> toast(key.name + " volvio a la lista"))
-                    .addOnFailureListener(error -> showMessage("No se pudo mostrar", cleanError(error)));
+                    .addOnFailureListener(error -> showMessage("No se pudo mostrar", friendlyError(error)));
                 return;
             }
         }
@@ -339,9 +445,11 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
             data.put("nombre", name);
             data.put("estado", "Disponible");
             data.put("quienTiene", "");
+            data.put("quienTieneId", "");
             data.put("fechaRetiro", "");
             data.put("horaRetiro", "");
             data.put("ultimoMovimiento", "");
+            data.put("ultimoMovimientoId", "");
             data.put("ultimaFecha", "");
             data.put("ultimaHora", "");
             data.put("activo", true);
@@ -350,7 +458,7 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
             transaction.set(metaReference, Collections.singletonMap("siguienteLlave", next + 1), SetOptions.merge());
             return name;
         }).addOnSuccessListener(ignored -> toast(name + " fue agregada"))
-            .addOnFailureListener(error -> showMessage("No se pudo agregar", cleanError(error)));
+            .addOnFailureListener(error -> showMessage("No se pudo agregar", friendlyError(error)));
     }
 
     private void confirmHide(KeyItem key) {
@@ -365,7 +473,7 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
             .setPositiveButton("Si, ocultar", (dialog, which) ->
                 database.collection("llaves").document(key.id).update("activo", false)
                     .addOnSuccessListener(ignored -> toast("Llave oculta"))
-                    .addOnFailureListener(error -> showMessage("No se pudo ocultar", cleanError(error))))
+                    .addOnFailureListener(error -> showMessage("No se pudo ocultar", friendlyError(error))))
             .show();
     }
 
@@ -382,7 +490,7 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
                 KeyItem key = hiddenKeys.get(index);
                 database.collection("llaves").document(key.id).update("activo", true)
                     .addOnSuccessListener(ignored -> toast(key.name + " volvio a la lista"))
-                    .addOnFailureListener(error -> showMessage("No se pudo mostrar", cleanError(error)));
+                    .addOnFailureListener(error -> showMessage("No se pudo mostrar", friendlyError(error)));
             })
             .setNegativeButton("Cancelar", null)
             .show();
@@ -397,14 +505,43 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
         return stored == null ? 1L : stored;
     }
 
+    private static String keyPersonName(String value) {
+        return cleanName(value).toUpperCase(new Locale("es", "AR"));
+    }
+
+    private static String keyPersonId(String name) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                .digest(name.getBytes(StandardCharsets.UTF_8));
+            StringBuilder id = new StringBuilder("E");
+            for (int index = 0; index < 12; index++) {
+                id.append(String.format(Locale.US, "%02x", digest[index] & 0xff));
+            }
+            return id.toString();
+        } catch (Exception error) {
+            throw new IllegalStateException("No se pudo guardar el nombre");
+        }
+    }
     private static String cleanName(String value) {
         return value.trim().replaceAll("\\s+", " ");
     }
 
-    private static String cleanError(Exception error) {
-        String message = error.getMessage();
-        return message == null ? "Operacion rechazada"
-            : message.replace("java.lang.IllegalStateException: ", "");
+    private static String friendlyError(Exception error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof IllegalStateException && current.getMessage() != null) {
+                return current.getMessage().replace("java.lang.IllegalStateException: ", "");
+            }
+            current = current.getCause();
+        }
+        String message = error.getMessage() == null ? "" : error.getMessage().toUpperCase(Locale.ROOT);
+        if (message.contains("UNAVAILABLE") || message.contains("NETWORK") || message.contains("TIMEOUT")) {
+            return "No hay conexión. Intenta nuevamente.";
+        }
+        if (message.contains("PERMISSION_DENIED")) {
+            return "No tienes permiso para realizar esta acción.";
+        }
+        return "No se pudo completar la operación. Intenta nuevamente.";
     }
 
     private static String today() {
@@ -439,6 +576,32 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
             .setTitle(title).setMessage(message).setPositiveButton("Aceptar", null).show());
     }
 
+    private void showLoadError(String source, String title, Exception error, Runnable retry) {
+        if (retriedLoads.contains(source) && reportedLoads.add(source)) {
+            AppErrorReporter.report(database, source, error);
+        }
+        if (loadErrorDialogVisible || isFinishing()) return;
+        loadErrorDialogVisible = true;
+        runOnUiThread(() -> {
+            if (isFinishing()) {
+                loadErrorDialogVisible = false;
+                return;
+            }
+            AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(friendlyError(error) + "\n\nLos datos anteriores seguirán visibles.")
+                .setNegativeButton("Cerrar", null)
+                .setPositiveButton("Reintentar", (ignored, which) -> {
+                    loadErrorDialogVisible = false;
+                    retriedLoads.add(source);
+                    retry.run();
+                })
+                .create();
+            dialog.setOnDismissListener(ignored -> loadErrorDialogVisible = false);
+            dialog.show();
+        });
+    }
+
     private void toast(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
@@ -446,7 +609,7 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
     @Override protected void onDestroy() {
         if (keysListener != null) keysListener.remove();
         if (peopleListener != null) peopleListener.remove();
-        sheets.close();
+        if (keyPeopleListener != null) keyPeopleListener.remove();
         super.onDestroy();
     }
 }

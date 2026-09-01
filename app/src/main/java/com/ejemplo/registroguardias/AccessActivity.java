@@ -39,13 +39,12 @@ import java.util.Map;
 public final class AccessActivity extends Activity implements PeopleAdapter.Actions {
     static final String PREFS_NAME = "registro_guardias";
     static final String USER_NAME_KEY = "operator_user_name";
-    static final String SHEETS_WEB_URL = "https://docs.google.com/spreadsheets/d/1qh4aP9Hot-tAO5i7fEfzNTqQ2YK71xFkwgrm7uuDIcw/edit";
+    static final String SHEETS_WEB_URL = BuildConfig.SHEETS_WEB_URL;
 
     private final List<Person> visiblePeople = new ArrayList<>();
     private final List<Person> hiddenPeople = new ArrayList<>();
     private final List<Person> removedPeople = new ArrayList<>();
     private final List<Person> filteredPeople = new ArrayList<>();
-    private final SheetsClient sheets = new SheetsClient();
 
     private FirebaseFirestore database;
     private FirebaseAuth authentication;
@@ -56,6 +55,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
     private TextView count;
     private TextView borrowedKeys;
     private PeopleAdapter adapter;
+    private boolean admin;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -89,16 +89,24 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
             @Override public void afterTextChanged(Editable text) {}
         });
 
-        count.setText("Conectando con Firebase…");
+        count.setText("Cargando operarios…");
         authentication = FirebaseAuth.getInstance();
         database = FirebaseFirestore.getInstance();
+        if (BuildConfig.USE_FIREBASE_EMULATOR) {
+            authentication.useEmulator("10.0.2.2", 9099);
+            database.useEmulator("10.0.2.2", 8080);
+        }
         if (authentication.getCurrentUser() != null) startListeners();
         else authentication.signInAnonymously()
             .addOnSuccessListener(result -> startListeners())
-            .addOnFailureListener(error -> showMessage("Sin acceso", "No se pudo iniciar Firebase: " + cleanError(error)));
+            .addOnFailureListener(error -> showMessage("Sin conexión", friendlyError(error)));
     }
 
     private void openSheets() {
+        if (BuildConfig.USE_FIREBASE_EMULATOR || SHEETS_WEB_URL.trim().isEmpty()) {
+            toast("La planilla no está disponible");
+            return;
+        }
         startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(SHEETS_WEB_URL)));
     }
 
@@ -112,14 +120,40 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
     }
 
     private void startListeners() {
-        listenForPeople();
-        listenForBorrowedKeys();
+        registerDevice();
+    }
+
+    private void registerDevice() {
+        if (authentication.getCurrentUser() == null) return;
+        String uid = authentication.getCurrentUser().getUid();
+        Map<String, Object> device = new HashMap<>();
+        device.put("nombre", currentUser());
+        device.put("actualizado", FieldValue.serverTimestamp());
+        DocumentReference reference = database.collection("dispositivos").document(uid);
+        database.runTransaction(transaction -> {
+            DocumentSnapshot current = transaction.get(reference);
+            if (current.exists()) transaction.update(reference, device);
+            else {
+                device.put("estado", AdminAccess.BLOCKED);
+                transaction.set(reference, device);
+            }
+            return null;
+        }).addOnCompleteListener(task -> AdminAccess.checkRole(database, (allowed, role) -> {
+            admin = allowed;
+            if (AdminAccess.BLOCKED.equals(role)) {
+                startActivity(new Intent(this, BlockedActivity.class));
+                finish();
+                return;
+            }
+            listenForPeople();
+            listenForBorrowedKeys();
+        }));
     }
 
     private void listenForPeople() {
         peopleListener = database.collection("personal").addSnapshotListener((snapshot, error) -> {
             if (error != null) {
-                showMessage("Error de Firebase", cleanError(error));
+                showMessage("No se pudo cargar", friendlyError(error));
                 return;
             }
             if (snapshot == null) return;
@@ -166,8 +200,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
         filteredPeople.clear();
         String normalized = query.trim().toLowerCase(Locale.getDefault());
         for (Person person : visiblePeople) {
-            if (person.name.toLowerCase(Locale.getDefault()).contains(normalized)
-                || person.id.toLowerCase(Locale.getDefault()).contains(normalized)) {
+            if (person.name.toLowerCase(Locale.getDefault()).contains(normalized)) {
                 filteredPeople.add(person);
             }
         }
@@ -233,10 +266,9 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
             transaction.set(metaReference,
                 Collections.singletonMap("siguienteMovimiento", next + 1), SetOptions.merge());
             return movementId;
-        }).addOnSuccessListener(ignored -> {
-            showMessage("Registro correcto", type + " registrado a las " + time + " por " + registeredBy);
-            sheets.mirrorMovement(person, time, type, date);
-        }).addOnFailureListener(error -> showMessage("No se puede registrar", cleanError(error)));
+        }).addOnSuccessListener(movementId ->
+            toast(type + " registrado a las " + time + " por " + registeredBy))
+            .addOnFailureListener(error -> showMessage("No se puede registrar", friendlyError(error)));
     }
 
     private static Map<String, Object> baseMovement(String id, Person person, String type,
@@ -276,13 +308,15 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
         PopupMenu menu = new PopupMenu(this, anchor);
         menu.getMenu().add("Agregar operario");
         menu.getMenu().add("Mostrar operarios ocultos");
-        menu.getMenu().add("Registro de llaves");
+        if (admin) menu.getMenu().add("Administración");
         menu.getMenu().add("Cambiar usuario");
         menu.setOnMenuItemClickListener(item -> {
             String option = item.getTitle().toString();
             if (option.startsWith("Agregar")) showAddDialog();
             else if (option.startsWith("Mostrar")) showHiddenPeople();
-            else if (option.startsWith("Registro")) startActivity(new Intent(this, KeysActivity.class));
+            else if (option.startsWith("Administración")) {
+                startActivity(new Intent(this, AdminDashboardActivity.class));
+            }
             else showChangeUserDialog();
             return true;
         });
@@ -322,9 +356,8 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
                 database.collection("personal").document(person.id).update("activo", true, "retirado", false)
                     .addOnSuccessListener(ignored -> {
                         toast(person.name + " volvió a la lista");
-                        sheets.syncPerson("mostrar", person);
                     })
-                    .addOnFailureListener(error -> showMessage("No se pudo mostrar", cleanError(error)));
+                    .addOnFailureListener(error -> showMessage("No se pudo mostrar", friendlyError(error)));
                 return;
             }
         }
@@ -357,8 +390,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
             return person;
         }).addOnSuccessListener(person -> {
             toast(person.name + " fue agregado");
-            sheets.syncPerson("agregar", person);
-        }).addOnFailureListener(error -> showMessage("No se pudo agregar", cleanError(error)));
+        }).addOnFailureListener(error -> showMessage("No se pudo agregar", friendlyError(error)));
     }
 
     private void confirmHide(Person person) {
@@ -374,9 +406,8 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
                 database.collection("personal").document(person.id).update("activo", false, "retirado", false)
                     .addOnSuccessListener(ignored -> {
                         toast("Operario oculto");
-                        sheets.syncPerson("ocultar", person);
                     })
-                    .addOnFailureListener(error -> showMessage("No se pudo ocultar", cleanError(error))))
+                    .addOnFailureListener(error -> showMessage("No se pudo ocultar", friendlyError(error))))
             .show();
     }
 
@@ -394,9 +425,8 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
                 database.collection("personal").document(person.id).update("activo", true, "retirado", false)
                     .addOnSuccessListener(ignored -> {
                         toast(person.name + " volvió a la lista");
-                        sheets.syncPerson("mostrar", person);
                     })
-                    .addOnFailureListener(error -> showMessage("No se pudo mostrar", cleanError(error)));
+                    .addOnFailureListener(error -> showMessage("No se pudo mostrar", friendlyError(error)));
             })
             .setNegativeButton("Cancelar", null)
             .show();
@@ -416,7 +446,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
                 database.collection("personal").document(person.id)
                     .update("activo", false, "retirado", true, "actualizado", FieldValue.serverTimestamp())
                     .addOnSuccessListener(ignored -> toast("Operario quitado"))
-                    .addOnFailureListener(error -> showMessage("No se pudo quitar", cleanError(error))))
+                    .addOnFailureListener(error -> showMessage("No se pudo quitar", friendlyError(error))))
             .show();
     }
 
@@ -472,7 +502,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
                 }
                 showMovementChoice(person, daily, date);
             })
-            .addOnFailureListener(error -> showMessage("No se pudieron leer los horarios", cleanError(error)));
+            .addOnFailureListener(error -> showMessage("No se pudieron leer los horarios", friendlyError(error)));
     }
 
     private void startCancellation(Person person, String type) {
@@ -498,7 +528,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
                 }
                 confirmCancellation(person, type, target, daily, date);
             })
-            .addOnFailureListener(error -> showMessage("No se pudieron leer los horarios", cleanError(error)));
+            .addOnFailureListener(error -> showMessage("No se pudieron leer los horarios", friendlyError(error)));
     }
 
     private DailyMovements effectiveMovements(List<DocumentSnapshot> documents, String date) {
@@ -572,10 +602,9 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
             personUpdate.put("actualizado", FieldValue.serverTimestamp());
             transaction.update(personReference, personUpdate);
             return cancellationId;
-        }).addOnSuccessListener(ignored -> {
-            showMessage("Registro quitado", type + " de hoy fue quitado por " + registeredBy + ".");
-            sheets.cancelMovement(person, type, date);
-        }).addOnFailureListener(error -> showMessage("No se pudo quitar", cleanError(error)));
+        }).addOnSuccessListener(cancellationId ->
+            toast(type + " de hoy fue quitado por " + registeredBy))
+            .addOnFailureListener(error -> showMessage("No se pudo quitar", friendlyError(error)));
     }
     private static DocumentSnapshot newer(DocumentSnapshot current, DocumentSnapshot candidate) {
         if (current == null) return candidate;
@@ -671,11 +700,9 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
                     "hora", newTime, "actualizado", FieldValue.serverTimestamp());
             }
             return correctionId;
-        }).addOnSuccessListener(ignored -> {
-            showMessage("Hora modificada", type + " actualizado a las " + newTime + " por "
-                + registeredBy + ". El registro anterior quedó reemplazado.");
-            sheets.mirrorMovement(person, newTime, type, date);
-        }).addOnFailureListener(error -> showMessage("No se pudo modificar la hora", cleanError(error)));
+        }).addOnSuccessListener(correctionId ->
+            toast(type + " actualizado a las " + newTime + " por " + registeredBy))
+            .addOnFailureListener(error -> showMessage("No se pudo modificar la hora", friendlyError(error)));
     }
 
     private static String shownTime(DocumentSnapshot document) {
@@ -705,10 +732,22 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
         return value.trim().replaceAll("\\s+", " ");
     }
 
-    private static String cleanError(Exception error) {
-        String message = error.getMessage();
-        return message == null ? "Operación rechazada"
-            : message.replace("java.lang.IllegalStateException: ", "");
+    private static String friendlyError(Exception error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof IllegalStateException && current.getMessage() != null) {
+                return current.getMessage().replace("java.lang.IllegalStateException: ", "");
+            }
+            current = current.getCause();
+        }
+        String message = error.getMessage() == null ? "" : error.getMessage().toUpperCase(Locale.ROOT);
+        if (message.contains("UNAVAILABLE") || message.contains("NETWORK") || message.contains("TIMEOUT")) {
+            return "No hay conexión. Intenta nuevamente.";
+        }
+        if (message.contains("PERMISSION_DENIED")) {
+            return "No tienes permiso para realizar esta acción.";
+        }
+        return "No se pudo completar la operación. Intenta nuevamente.";
     }
 
     private static String today() {
@@ -746,7 +785,6 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
     @Override protected void onDestroy() {
         if (peopleListener != null) peopleListener.remove();
         if (keysListener != null) keysListener.remove();
-        sheets.close();
         super.onDestroy();
     }
 }

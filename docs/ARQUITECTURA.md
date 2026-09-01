@@ -1,25 +1,41 @@
 # Arquitectura
 
-Registro de Acceso es una aplicación Android privada para controlar los ingresos y salidas de operarios.
-
 ## Componentes
 
 | Componente | Función |
 | --- | --- |
-| Android | Lista de operarios, registro de movimientos, corrección de hora y anulaciones. |
-| Firebase Authentication | Inicia sesión anónima internamente para permitir el acceso a Firestore. No se muestra ningún identificador técnico al usuario. |
-| Cloud Firestore | Fuente principal de datos: operarios, movimientos y contadores de identificadores. |
-| Google Sheets | Copia visual secundaria de Personal y Registros. |
-| Apps Script | Recibe la copia desde la aplicación y actualiza la planilla. |
+| Android | Interfaz de operarios, accesos y préstamos de llaves. |
+| Firebase Authentication | Sesión anónima interna; el usuario visible es un nombre configurado en la app. |
+| Cloud Firestore | Fuente principal de operarios, llaves, movimientos y contadores. |
+| Apps Script | Consulta Firestore cada minuto y actualiza la copia secundaria. |
+| Google Sheets | Vista operativa de Personal y pestañas mensuales de registros y llaves. |
 
 ## Código Android
 
-- `AccessActivity`: pantalla principal y operaciones de negocio.
-- `SetupActivity`: solicita el nombre del usuario al abrir por primera vez.
-- `PeopleAdapter`: presenta la lista y los botones de cada operario.
-- `Person`: modelo mínimo de un operario en pantalla.
-- `SheetsClient`: envía una copia secundaria a Google Sheets.
+- `AccessActivity`: accesos, operarios y navegación al módulo de llaves.
+- `KeysActivity`: catálogo, búsqueda, préstamos, devoluciones y administración de llaves.
+- `AdminDashboardActivity`: panel único con accesos administrativos, estado de Sheets, errores y reconstrucción mensual.
+- `AdminCorrectionsActivity`: consulta y corrección de movimientos de días anteriores.
+- `AdminKeysActivity`: correcciones históricas de préstamos y devoluciones.
+- `AdminDevicesActivity`: asignación remota de roles por dispositivo.
+- `BlockedActivity`: pantalla sin datos operativos para dispositivos sin permiso.
+- `AdminAccess`: comprobación de los roles Administrativo, Normal y Bloqueado.
+- `AppErrorReporter`: registra fallos de carga persistentes para el panel de Admin.
+- `KeysAdapter` y `KeyItem`: presentación del estado de cada llave.
+- `SetupActivity`: nombre humano del usuario que registra.
 
-## Fuente de verdad
+Android escribe únicamente en Firestore. No conserva una segunda cola ni envía datos directamente
+a Sheets; Apps Script genera esa copia de forma independiente y la app solo abre la planilla para
+consultarla.
 
-Firestore es la fuente principal. Sheets se usa como copia y vista operativa. Si la copia a Sheets falla por falta de conexión, el movimiento seguirá guardado en Firebase.
+## Flujo de una llave
+
+1. El usuario elige un operario por su ID interno.
+2. Una transacción lee la llave y el contador `meta/config`.
+3. La transacción crea un documento correlativo `L000001`, actualiza la llave y avanza el contador.
+4. Las reglas verifican que el movimiento, la llave y el operario coincidan dentro de esa misma operación.
+5. Cuando Firebase confirma, la operación queda finalizada para Android.
+6. Cada minuto Apps Script consulta Firestore, compara los IDs con las hojas técnicas y copia únicamente los pendientes.
+7. El estado y los errores quedan disponibles para la pantalla de Admin.
+
+Firestore siempre es la fuente de verdad. Un error de Sheets no revierte el movimiento: el siguiente ciclo vuelve a encontrar el ID pendiente y lo reintenta.

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Registro de Acceso Termux</string>
+    <string name="app_name">Registro de Acceso</string>
     <string name="app_subtitle">Control de operarios</string>
     <string name="search_hint">Buscar por nombre</string>
     <string name="more_options">Más opciones</string>
@@ -8,7 +8,7 @@
     <string name="entry">Ingreso</string>
     <string name="exit">Salida</string>
     <string name="operator_options">Opciones del operario</string>
-    <string name="setup_explanation">Identifica quién utilizará este dispositivo</string>
+    <string name="setup_explanation">Escribe tu nombre para registrar los movimientos</string>
     <string name="user_name_hint">Nombre del usuario</string>
     <string name="continue_label">Continuar</string>
     <string name="keys_title">Registro de llaves</string>
@@ -18,5 +18,9 @@
     <string name="key_options">Opciones de la llave</string>
     <string name="back">Volver</string>
     <string name="keys_shortcut">Llaves</string>
-    <string name="open_sheets">Abrir Sheets</string>
+    <string name="open_sheets">Abrir planilla</string>
+    <string name="admin_corrections_title">Correcciones anteriores</string>
+    <string name="admin_corrections_subtitle">Uso exclusivo de Admin</string>
+    <string name="select_operator">Seleccionar operario</string>
+    <string name="select_date">Seleccionar fecha</string>
 </resources>

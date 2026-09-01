@@ -23,3 +23,18 @@ Thumbs.db
 
 # Local Gradle cache copied during development
 work/
+
+# Local Firebase Emulator logs
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Local Apps Script project connection
+.clasp.json
+apps-script/.clasp.json
+# Private Codex handoff packages
+ENTREGA_CODEX_REGISTRO_ACCESO_*/
+ENTREGA_CODEX_REGISTRO_ACCESO_*.zip
+ENTREGA_CODEX_REGISTRO_ACCESO_*.zip.sha256.txt
+# Dependencias locales de las pruebas JavaScript
+node_modules/
