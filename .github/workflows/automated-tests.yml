@@ -43,6 +43,33 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
       - name: Install test dependencies
         run: npm ci
+      - name: Create test-only Firebase configuration
+        run: |
+          cat > app/google-services.json <<'JSON'
+          {
+            "project_info": {
+              "project_number": "123456789012",
+              "project_id": "registro-guardias-ci",
+              "storage_bucket": "registro-guardias-ci.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:123456789012:android:0000000000000000",
+                  "android_client_info": {
+                    "package_name": "com.ejemplo.registroguardias"
+                  }
+                },
+                "api_key": [
+                  {
+                    "current_key": "ci_test_key_not_connected_to_any_project"
+                  }
+                ]
+              }
+            ],
+            "configuration_version": "1"
+          }
+          JSON
       - name: Test Android logic
         run: ./gradlew --no-daemon testDebugUnitTest
       - name: Test Firestore rules and Sheets contract
