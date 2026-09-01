@@ -270,6 +270,17 @@ async function run() {
     await assertSucceeds(getDoc(doc(dbAs(USERS.admin), "meta", "config")));
     await assertFails(getDoc(doc(dbAs(USERS.blocked), "meta", "config")));
   });
+  await test("un administrador puede eliminar otro dispositivo y su permiso", async () => {
+    await assertSucceeds(setDoc(doc(dbAs(USERS.admin), "administradores", USERS.normal), {
+      activo: false, nombre: "GUARDIA NORMAL", actualizado: serverTimestamp(),
+    }));
+    await assertSucceeds(deleteDoc(doc(dbAs(USERS.admin), "administradores", USERS.normal)));
+    await assertSucceeds(deleteDoc(doc(dbAs(USERS.admin), "dispositivos", USERS.normal)));
+  });
+  await test("un administrador no puede eliminar su propio acceso", async () => {
+    await assertFails(deleteDoc(doc(dbAs(USERS.admin), "administradores", USERS.admin)));
+    await assertFails(deleteDoc(doc(dbAs(USERS.admin), "dispositivos", USERS.admin)));
+  });
 
   console.log(`\nResultado: ${passed} aprobadas, ${failed} fallidas.`);
   if (failed > 0) process.exitCode = 1;

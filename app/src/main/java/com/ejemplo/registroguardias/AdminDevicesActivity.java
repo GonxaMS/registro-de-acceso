@@ -126,8 +126,43 @@ public final class AdminDevicesActivity extends Activity {
             action.setEnabled(!own);
             action.setOnClickListener(view -> chooseRole(device, role));
             panel.addView(action);
+
+            if (!own) {
+                Button remove = new Button(this);
+                remove.setAllCaps(false);
+                remove.setText("Eliminar dispositivo");
+                remove.setTextColor(getColor(R.color.gold_dark));
+                remove.setOnClickListener(view -> confirmRemove(device));
+                panel.addView(remove);
+            }
             container.addView(panel);
         }
+    }
+
+    private void confirmRemove(Device device) {
+        String label = device.name.isEmpty() ? "Dispositivo sin nombre" : device.name;
+        new AlertDialog.Builder(this)
+            .setTitle("Eliminar dispositivo")
+            .setMessage("Se eliminará " + label + "\n\n" + device.uid
+                + "\n\nSi ese teléfono todavía está en uso, deberá registrarse y autorizarse nuevamente.")
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Eliminar", (dialog, which) -> removeDevice(device))
+            .show();
+    }
+
+    private void removeDevice(Device device) {
+        if (ownUid.equals(device.uid)) return;
+        database.runBatch(batch -> {
+            batch.delete(database.collection("administradores").document(device.uid));
+            batch.delete(database.collection("dispositivos").document(device.uid));
+        })
+            .addOnSuccessListener(ignored -> Toast.makeText(this,
+                "Dispositivo eliminado", Toast.LENGTH_SHORT).show())
+            .addOnFailureListener(error -> new AlertDialog.Builder(this)
+                .setTitle("No se pudo eliminar")
+                .setMessage(error.getMessage() == null ? "Operación rechazada" : error.getMessage())
+                .setPositiveButton("Cerrar", null)
+                .show());
     }
 
     private void chooseRole(Device device, String currentRole) {

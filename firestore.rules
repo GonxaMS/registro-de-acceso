@@ -29,7 +29,7 @@ service cloud.firestore {
         && request.resource.data.nombre is string
         && request.resource.data.nombre.size() <= 80
         && request.resource.data.actualizado is timestamp;
-      allow delete: if false;
+      allow delete: if isAdmin() && request.auth.uid != uid;
     }
 
     match /dispositivos/{uid} {
@@ -54,7 +54,7 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado','actualizado'])
           && request.resource.data.estado in ['Normal','Bloqueado']
           && request.resource.data.actualizado is timestamp);
-      allow delete: if false;
+      allow delete: if isAdmin() && request.auth.uid != uid;
     }
 
     match /servicios/{uid} {
