@@ -52,6 +52,7 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
     private boolean loadErrorDialogVisible;
     private final Set<String> retriedLoads = new HashSet<>();
     private final Set<String> reportedLoads = new HashSet<>();
+    private final Set<String> pendingMovements = new HashSet<>();
     private SharedPreferences preferences;
     private EditText search;
     private TextView count;
@@ -298,6 +299,8 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
     }
 
     private void saveKeyMovement(KeyItem key, String type, SelectablePerson person) {
+        if (!pendingMovements.add(key.id)) return;
+        adapter.notifyDataSetChanged();
         boolean take = "Retiro".equals(type);
         String date = today();
         String time = currentTime();
@@ -370,10 +373,23 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
             transaction.set(metaReference,
                 Collections.singletonMap("siguienteMovimientoLlave", next + 1), SetOptions.merge());
             return movementId;
-        }).addOnSuccessListener(movementId ->
+        }).addOnSuccessListener(movementId -> {
+            finishKeyMovement(key.id);
             toast((take ? person.name + " retiró " : person.name + " devolvió ") + key.name
-                + " a las " + time))
-            .addOnFailureListener(error -> showMessage("No se pudo registrar", friendlyError(error)));
+                + " a las " + time);
+        }).addOnFailureListener(error -> {
+            finishKeyMovement(key.id);
+            showMessage("No se pudo registrar", friendlyError(error));
+        });
+    }
+
+    @Override public boolean isKeyMovementPending(KeyItem key) {
+        return pendingMovements.contains(key.id);
+    }
+
+    private void finishKeyMovement(String keyId) {
+        pendingMovements.remove(keyId);
+        adapter.notifyDataSetChanged();
     }
 
     @Override public void onKeyOptions(View anchor, KeyItem key) {

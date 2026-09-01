@@ -2,10 +2,18 @@ param([switch]$StopAndroidEmulator)
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $pidFile = Join-Path $projectRoot "build\local-test\firebase.pid"
+
+function Stop-ProcessTree([int]$TargetProcessId) {
+    $children = Get-CimInstance Win32_Process -Filter "ParentProcessId=$TargetProcessId" -ErrorAction SilentlyContinue
+    foreach ($child in $children) { Stop-ProcessTree -TargetProcessId $child.ProcessId }
+    if (Get-Process -Id $TargetProcessId -ErrorAction SilentlyContinue) {
+        Stop-Process -Id $TargetProcessId -Force
+    }
+}
+
 if (Test-Path -LiteralPath $pidFile) {
     $savedPid = [int](Get-Content -Raw -LiteralPath $pidFile)
-    $process = Get-Process -Id $savedPid -ErrorAction SilentlyContinue
-    if ($process) { Stop-Process -Id $savedPid }
+    Stop-ProcessTree -TargetProcessId $savedPid
     Remove-Item -LiteralPath $pidFile -ErrorAction SilentlyContinue
 }
 if ($StopAndroidEmulator) {

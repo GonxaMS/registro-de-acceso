@@ -35,6 +35,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 public final class AccessActivity extends Activity implements PeopleAdapter.Actions {
     static final String PREFS_NAME = "registro_guardias";
@@ -45,6 +47,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
     private final List<Person> hiddenPeople = new ArrayList<>();
     private final List<Person> removedPeople = new ArrayList<>();
     private final List<Person> filteredPeople = new ArrayList<>();
+    private final Set<String> pendingMovements = new HashSet<>();
 
     private FirebaseFirestore database;
     private FirebaseAuth authentication;
@@ -92,10 +95,6 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
         count.setText("Cargando operarios…");
         authentication = FirebaseAuth.getInstance();
         database = FirebaseFirestore.getInstance();
-        if (BuildConfig.USE_FIREBASE_EMULATOR) {
-            authentication.useEmulator("10.0.2.2", 9099);
-            database.useEmulator("10.0.2.2", 8080);
-        }
         if (authentication.getCurrentUser() != null) startListeners();
         else authentication.signInAnonymously()
             .addOnSuccessListener(result -> startListeners())
@@ -213,17 +212,22 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
     }
 
     @Override public void onMovement(Person person, String type) {
+        if (!pendingMovements.add(person.id)) return;
+        adapter.notifyDataSetChanged();
         boolean entry = "Ingreso".equals(type);
         String date = today();
         if (entry && "Dentro".equals(person.state)) {
+            finishMovement(person.id);
             showMessage("No se puede registrar", person.name + " ya está dentro");
             return;
         }
         if (!entry && "Fuera".equals(person.state)) {
+            finishMovement(person.id);
             showMessage("No se puede registrar", "Primero debes registrar el ingreso de " + person.name);
             return;
         }
         if (entry && date.equals(person.date) && "Salida".equals(person.lastMovement)) {
+            finishMovement(person.id);
             showMessage("No se puede registrar", person.name + " ya completó el ingreso y la salida de hoy");
             return;
         }
@@ -266,9 +270,22 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
             transaction.set(metaReference,
                 Collections.singletonMap("siguienteMovimiento", next + 1), SetOptions.merge());
             return movementId;
-        }).addOnSuccessListener(movementId ->
-            toast(type + " registrado a las " + time + " por " + registeredBy))
-            .addOnFailureListener(error -> showMessage("No se puede registrar", friendlyError(error)));
+        }).addOnSuccessListener(movementId -> {
+            finishMovement(person.id);
+            toast(type + " registrado a las " + time + " por " + registeredBy);
+        }).addOnFailureListener(error -> {
+            finishMovement(person.id);
+            showMessage("No se puede registrar", friendlyError(error));
+        });
+    }
+
+    @Override public boolean isMovementPending(Person person) {
+        return pendingMovements.contains(person.id);
+    }
+
+    private void finishMovement(String personId) {
+        pendingMovements.remove(personId);
+        adapter.notifyDataSetChanged();
     }
 
     private static Map<String, Object> baseMovement(String id, Person person, String type,

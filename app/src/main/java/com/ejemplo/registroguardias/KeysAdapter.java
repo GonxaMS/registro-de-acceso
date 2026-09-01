@@ -14,6 +14,7 @@ final class KeysAdapter extends BaseAdapter {
     interface Actions {
         void onKeyMovement(KeyItem key, String type);
         void onKeyOptions(View anchor, KeyItem key);
+        boolean isKeyMovementPending(KeyItem key);
     }
 
     private final KeysActivity activity;
@@ -42,6 +43,7 @@ final class KeysAdapter extends BaseAdapter {
 
         KeyItem key = getItem(position);
         boolean borrowed = "Prestada".equals(key.state);
+        boolean pending = actions.isKeyMovementPending(key);
         holder.name.setText(key.name);
         holder.status.setText(borrowed ? "● Prestada" : "✓ Disponible");
         holder.status.setTextColor(Color.parseColor(borrowed ? "#B25A00" : "#1B7F4B"));
@@ -49,8 +51,8 @@ final class KeysAdapter extends BaseAdapter {
             ? "La tiene " + key.holder + " desde " + key.date + " " + key.time
             : "Lista para retirar");
 
-        setEnabled(holder.take, !borrowed);
-        setEnabled(holder.returnKey, borrowed);
+        setEnabled(holder.take, !pending && !borrowed);
+        setEnabled(holder.returnKey, !pending && borrowed);
         holder.take.setOnClickListener(view -> actions.onKeyMovement(key, "Retiro"));
         holder.returnKey.setOnClickListener(view -> actions.onKeyMovement(key, "Devolucion"));
         holder.options.setOnClickListener(view -> actions.onKeyOptions(view, key));
