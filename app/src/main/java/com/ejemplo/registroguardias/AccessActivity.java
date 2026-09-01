@@ -327,6 +327,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
         menu.getMenu().add("Mostrar operarios ocultos");
         if (admin) menu.getMenu().add("Administración");
         menu.getMenu().add("Cambiar usuario");
+        menu.getMenu().add("Versión " + BuildConfig.VERSION_NAME).setEnabled(false);
         menu.setOnMenuItemClickListener(item -> {
             String option = item.getTitle().toString();
             if (option.startsWith("Agregar")) showAddDialog();

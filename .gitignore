@@ -4,6 +4,9 @@
 *.iml
 .idea/
 local.properties
+keystore.properties
+*.jks
+*.keystore
 .firebaserc
 
 # Firebase configuration of the production project

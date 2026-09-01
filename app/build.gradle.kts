@@ -6,6 +6,10 @@ val localProperties = Properties().apply {
 }
 val sheetsWebUrl = localProperties.getProperty("sheets.web_url", "")
 val useFirebaseEmulator = providers.gradleProperty("firebaseEmulator").orNull.toBoolean()
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
 
 plugins {
     id("com.android.application")
@@ -24,10 +28,27 @@ android {
         applicationId = "com.ejemplo.registroguardias"
         minSdk = 24
         targetSdk = 35
-        versionCode = 45
-        versionName = "3.9.15"
+        versionCode = 46
+        versionName = "3.9.16"
         buildConfigField("String", "SHEETS_WEB_URL", "\"${sheetsWebUrl.replace("\"", "\\\"")}\"")
         buildConfigField("boolean", "USE_FIREBASE_EMULATOR", useFirebaseEmulator.toString())
+    }
+
+    signingConfigs {
+        create("release") {
+            if (keystoreProperties.isNotEmpty()) {
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+        }
     }
 }
 
