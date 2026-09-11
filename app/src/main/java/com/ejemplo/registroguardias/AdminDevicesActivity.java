@@ -48,7 +48,7 @@ public final class AdminDevicesActivity extends AppCompatActivity {
         }
         AdminAccess.check(database, (allowed, uid) -> {
             if (!allowed) {
-                Toast.makeText(this, "Esta sección requiere permiso administrativo",
+                Toast.makeText(this, getString(R.string.admin_permission_required),
                     Toast.LENGTH_LONG).show();
                 finish();
                 return;
@@ -61,7 +61,7 @@ public final class AdminDevicesActivity extends AppCompatActivity {
     private void listenForPermissions() {
         adminsListener = database.collection("administradores").addSnapshotListener((snapshot, error) -> {
             if (error != null || snapshot == null) {
-                status.setText("No se pudieron consultar los permisos");
+                status.setText(R.string.admin_permissions_load_failed);
                 return;
             }
             permissions.clear();
@@ -75,7 +75,7 @@ public final class AdminDevicesActivity extends AppCompatActivity {
     private void listenForDevices() {
         devicesListener = database.collection("dispositivos").addSnapshotListener((snapshot, error) -> {
             if (error != null || snapshot == null) {
-                status.setText("No se pudieron cargar los dispositivos");
+                status.setText(R.string.admin_devices_load_failed);
                 return;
             }
             devices.clear();
@@ -91,8 +91,9 @@ public final class AdminDevicesActivity extends AppCompatActivity {
 
     private void render() {
         container.removeAllViews();
-        status.setText(devices.isEmpty() ? "No hay otros dispositivos registrados"
-            : devices.size() + (devices.size() == 1 ? " dispositivo registrado" : " dispositivos registrados"));
+        status.setText(devices.isEmpty() ? getString(R.string.admin_no_other_devices)
+            : devices.size() == 1 ? getString(R.string.admin_device_count_one)
+                : getString(R.string.admin_device_count_many, devices.size()));
         for (Device device : devices) {
             boolean own = ownUid.equals(device.uid);
             boolean enabled = Boolean.TRUE.equals(permissions.get(device.uid));
@@ -108,15 +109,16 @@ public final class AdminDevicesActivity extends AppCompatActivity {
             panel.setBackgroundResource(R.drawable.panel);
 
             TextView name = new TextView(this);
-            name.setText((device.name.isEmpty() ? "Dispositivo sin nombre" : device.name)
-                + (own ? " · ESTE TELÉFONO" : ""));
+            String deviceName = device.name.isEmpty() ? getString(R.string.admin_device_no_name)
+                : device.name;
+            name.setText(own ? getString(R.string.admin_device_name_self, deviceName) : deviceName);
             name.setTextColor(getColor(R.color.text));
             name.setTextSize(18);
             name.setTypeface(null, android.graphics.Typeface.BOLD);
             panel.addView(name);
 
             TextView uid = new TextView(this);
-            uid.setText(device.uid + "\n" + role);
+            uid.setText(getString(R.string.admin_device_uid_role, device.uid, roleLabel(role)));
             uid.setTextColor(getColor(enabled ? R.color.green
                 : AdminAccess.BLOCKED.equals(role) ? R.color.gold_dark : R.color.muted));
             uid.setTextSize(14);
@@ -125,7 +127,7 @@ public final class AdminDevicesActivity extends AppCompatActivity {
 
             Button action = new Button(this);
             action.setAllCaps(false);
-            action.setText(own ? "Tu permiso no se modifica desde aquí" : "Cambiar permiso");
+            action.setText(own ? R.string.admin_self_permission : R.string.admin_change_permission);
             action.setEnabled(!own);
             action.setOnClickListener(view -> chooseRole(device, role));
             panel.addView(action);
@@ -133,7 +135,7 @@ public final class AdminDevicesActivity extends AppCompatActivity {
             if (!own) {
                 Button remove = new Button(this);
                 remove.setAllCaps(false);
-                remove.setText("Eliminar dispositivo");
+                remove.setText(R.string.admin_remove_device);
                 remove.setTextColor(getColor(R.color.gold_dark));
                 remove.setOnClickListener(view -> confirmRemove(device));
                 panel.addView(remove);
@@ -143,13 +145,12 @@ public final class AdminDevicesActivity extends AppCompatActivity {
     }
 
     private void confirmRemove(Device device) {
-        String label = device.name.isEmpty() ? "Dispositivo sin nombre" : device.name;
+        String label = device.name.isEmpty() ? getString(R.string.admin_device_no_name) : device.name;
         new AlertDialog.Builder(this)
-            .setTitle("Eliminar dispositivo")
-            .setMessage("Se eliminará " + label + "\n\n" + device.uid
-                + "\n\nSi ese teléfono todavía está en uso, deberá registrarse y autorizarse nuevamente.")
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Eliminar", (dialog, which) -> removeDevice(device))
+            .setTitle(R.string.admin_remove_device_title)
+            .setMessage(getString(R.string.admin_remove_device_message, label, device.uid))
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.admin_remove_device, (dialog, which) -> removeDevice(device))
             .show();
     }
 
@@ -160,11 +161,11 @@ public final class AdminDevicesActivity extends AppCompatActivity {
             batch.delete(database.collection("dispositivos").document(device.uid));
         })
             .addOnSuccessListener(ignored -> Toast.makeText(this,
-                "Dispositivo eliminado", Toast.LENGTH_SHORT).show())
+                R.string.admin_device_removed, Toast.LENGTH_SHORT).show())
             .addOnFailureListener(error -> new AlertDialog.Builder(this)
-                .setTitle("No se pudo eliminar")
-                .setMessage(error.getMessage() == null ? "Operación rechazada" : error.getMessage())
-                .setPositiveButton("Cerrar", null)
+                .setTitle(R.string.admin_remove_device_failed)
+                .setMessage(R.string.admin_operation_rejected)
+                .setPositiveButton(R.string.dialog_close, null)
                 .show());
     }
 
@@ -173,26 +174,27 @@ public final class AdminDevicesActivity extends AppCompatActivity {
         int selected = AdminAccess.ADMIN.equals(currentRole) ? 0
             : AdminAccess.NORMAL.equals(currentRole) ? 1 : 2;
         new AlertDialog.Builder(this)
-            .setTitle(device.name.isEmpty() ? "Permiso del dispositivo" : device.name)
+            .setTitle(device.name.isEmpty() ? getString(R.string.admin_device_permission_title) : device.name)
             .setSingleChoiceItems(roles, selected, (dialog, which) -> {
                 dialog.dismiss();
                 confirmRole(device, roles[which]);
             })
-            .setNegativeButton("Cancelar", null)
+            .setNegativeButton(R.string.dialog_cancel, null)
             .show();
     }
 
     private void confirmRole(Device device, String role) {
         String explanation = AdminAccess.ADMIN.equals(role)
-            ? "podrá utilizar todas las funciones y administrar otros dispositivos."
+            ? getString(R.string.admin_role_admin_explanation)
             : AdminAccess.NORMAL.equals(role)
-                ? "podrá operar personal y llaves, pero no acceder a las herramientas exclusivas de Admin."
-            : "no podrá ver personal, llaves, movimientos ni planillas.";
+                ? getString(R.string.admin_role_normal_explanation)
+            : getString(R.string.admin_role_blocked_explanation);
         new AlertDialog.Builder(this)
-            .setTitle("Asignar permiso " + role)
-            .setMessage((device.name.isEmpty() ? device.uid : device.name) + " " + explanation)
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Confirmar", (dialog, which) -> changeRole(device, role))
+            .setTitle(getString(R.string.admin_assign_permission_title, roleLabel(role)))
+            .setMessage(getString(R.string.admin_assign_permission_message,
+                device.name.isEmpty() ? device.uid : device.name, explanation))
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.admin_confirm, (dialog, which) -> changeRole(device, role))
             .show();
     }
 
@@ -213,11 +215,12 @@ public final class AdminDevicesActivity extends AppCompatActivity {
             return null;
         })
             .addOnSuccessListener(ignored -> Toast.makeText(this,
-                "Permiso " + role + " asignado", Toast.LENGTH_SHORT).show())
+                getString(R.string.admin_permission_assigned, roleLabel(role)),
+                Toast.LENGTH_SHORT).show())
             .addOnFailureListener(error -> new AlertDialog.Builder(this)
-                .setTitle("No se pudo cambiar el permiso")
-                .setMessage(error.getMessage() == null ? "Operación rechazada" : error.getMessage())
-                .setPositiveButton("Cerrar", null)
+                .setTitle(R.string.admin_change_permission_failed)
+                .setMessage(R.string.admin_operation_rejected)
+                .setPositiveButton(R.string.dialog_close, null)
                 .show());
     }
 
@@ -236,6 +239,12 @@ public final class AdminDevicesActivity extends AppCompatActivity {
     }
 
     private static String value(String value) { return value == null ? "" : value; }
+
+    private String roleLabel(String role) {
+        if (AdminAccess.ADMIN.equals(role)) return getString(R.string.admin_role_admin_label);
+        if (AdminAccess.NORMAL.equals(role)) return getString(R.string.admin_role_normal_label);
+        return getString(R.string.admin_role_blocked_label);
+    }
 
     @Override protected void onResume() {
         super.onResume();

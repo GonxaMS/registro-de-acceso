@@ -1,5 +1,7 @@
 package com.ejemplo.registroguardias;
 
+import android.content.Context;
+
 final class SelectablePerson {
     final String id;
     final String name;
@@ -17,6 +19,12 @@ final class SelectablePerson {
         this.keyOnly = keyOnly;
     }
 
+    String label(Context context) {
+        if (keyOnly) return context.getString(R.string.only_keys_label, name);
+        return hidden ? context.getString(R.string.hidden_person_label, name) : name;
+    }
+
+    /** Kept for model tests; production UI uses {@link #label(Context)}. */
     String label() {
         if (keyOnly) return name + " (solo llaves)";
         return hidden ? name + " (oculto)" : name;

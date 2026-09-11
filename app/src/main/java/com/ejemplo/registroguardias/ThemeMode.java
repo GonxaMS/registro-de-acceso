@@ -36,7 +36,7 @@ final class ThemeMode {
                 dialog.dismiss();
                 AppCompatDelegate.setDefaultNightMode(toNightMode(which));
             })
-            .setNegativeButton("Cancelar", null)
+            .setNegativeButton(R.string.dialog_cancel, null)
             .show();
     }
 

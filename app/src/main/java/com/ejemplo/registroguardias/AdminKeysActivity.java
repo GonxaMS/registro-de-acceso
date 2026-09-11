@@ -80,7 +80,7 @@ public final class AdminKeysActivity extends AppCompatActivity {
         setActionsEnabled(false);
         AdminAccess.check(database, (allowed, uid) -> {
             if (!allowed) {
-                Toast.makeText(this, "Este dispositivo no tiene permiso de administrador\nUID: " + uid,
+                Toast.makeText(this, getString(R.string.admin_permission_uid, uid),
                     Toast.LENGTH_LONG).show();
                 finish();
                 return;
@@ -105,7 +105,8 @@ public final class AdminKeysActivity extends AppCompatActivity {
         keysListener = database.collection("llaves").addSnapshotListener((snapshot, error) -> {
             if (error != null || snapshot == null) {
                 if (error != null) {
-                    showLoadError("Admin · Llaves", "No se pudieron cargar las llaves", error,
+                    showLoadError(getString(R.string.admin_keys_title),
+                        getString(R.string.admin_keys_load_failed), error,
                         this::listenForKeys);
                 }
                 return;
@@ -123,7 +124,7 @@ public final class AdminKeysActivity extends AppCompatActivity {
                 String.CASE_INSENSITIVE_ORDER.compare(left.name, right.name));
             selectedKey = findKey(selectedId);
             if (selectedKey == null && !keys.isEmpty()) selectedKey = keys.get(0);
-            keyButton.setText(selectedKey == null ? "Seleccionar llave" : selectedKey.name);
+            keyButton.setText(selectedKey == null ? getString(R.string.admin_select_key) : selectedKey.name);
             loadMovements();
         });
     }
@@ -132,7 +133,8 @@ public final class AdminKeysActivity extends AppCompatActivity {
         if (personalListener != null) personalListener.remove();
         personalListener = database.collection("personal").addSnapshotListener((snapshot, error) -> {
             if (error != null) {
-                showLoadError("Admin · Personal", "No se pudo cargar el personal", error,
+                showLoadError(getString(R.string.admin_keys_title),
+                    getString(R.string.admin_people_load_failed), error,
                     this::listenForPeople);
                 return;
             }
@@ -148,8 +150,8 @@ public final class AdminKeysActivity extends AppCompatActivity {
         if (keyPeopleListener != null) keyPeopleListener.remove();
         keyPeopleListener = database.collection("operariosLlaves").addSnapshotListener((snapshot, error) -> {
             if (error != null) {
-                showLoadError("Admin · Operarios de llaves",
-                    "No se pudieron cargar los operarios de llaves", error,
+                showLoadError(getString(R.string.admin_keys_title),
+                    getString(R.string.admin_key_workers_load_failed), error,
                     this::listenForPeople);
                 return;
             }
@@ -184,12 +186,12 @@ public final class AdminKeysActivity extends AppCompatActivity {
         if (keys.isEmpty()) return;
         String[] options = new String[keys.size()];
         for (int i = 0; i < keys.size(); i++) options[i] = keys.get(i).name;
-        new AlertDialog.Builder(this).setTitle("Seleccionar llave")
+        new AlertDialog.Builder(this).setTitle(R.string.admin_select_key)
             .setItems(options, (dialog, index) -> {
                 selectedKey = keys.get(index);
                 keyButton.setText(selectedKey.name);
                 loadMovements();
-            }).setNegativeButton("Cancelar", null).show();
+            }).setNegativeButton(R.string.dialog_cancel, null).show();
     }
 
     private void chooseDate() {
@@ -213,7 +215,7 @@ public final class AdminKeysActivity extends AppCompatActivity {
         }
         loading = true;
         setActionsEnabled(false);
-        movementText.setText("Buscando movimientos…");
+        movementText.setText(R.string.admin_movements_loading);
         database.collection("movimientosLlaves").whereEqualTo("llaveId", selectedKey.id).get()
             .addOnSuccessListener(snapshot -> {
                 movements.clear();
@@ -237,20 +239,21 @@ public final class AdminKeysActivity extends AppCompatActivity {
             }).addOnFailureListener(error -> {
                 loading = false;
                 renderMovements();
-                showMessage("No se pudieron leer los movimientos", friendlyError(error));
+                showMessage(getString(R.string.error_load_failed), friendlyError(error));
             });
     }
 
     private void renderMovements() {
-        if (selectedKey == null) movementText.setText("Selecciona una llave");
-        else if (movements.isEmpty()) movementText.setText("Sin movimientos el " + selectedDate);
+        if (selectedKey == null) movementText.setText(R.string.admin_select_key_prompt_text);
+        else if (movements.isEmpty()) movementText.setText(getString(R.string.admin_no_key_movements,
+            selectedDate));
         else {
-            StringBuilder text = new StringBuilder("Movimientos del ").append(selectedDate);
+            StringBuilder text = new StringBuilder(getString(R.string.admin_movements_title,
+                selectedDate));
             for (DocumentSnapshot movement : movements) {
-                text.append("\n\n").append(value(movement.getString("movimiento")))
-                    .append(" · ").append(shownTime(movement))
-                    .append(" · ").append(value(movement.getString("persona")))
-                    .append("\nID ").append(movement.getId());
+                text.append("\n\n").append(getString(R.string.admin_movement_item,
+                    movementLabel(value(movement.getString("movimiento"))), shownTime(movement),
+                    value(movement.getString("persona")), movement.getId()));
             }
             movementText.setText(text);
         }
@@ -265,37 +268,42 @@ public final class AdminKeysActivity extends AppCompatActivity {
 
     private void choosePerson(String type) {
         if (selectedKey == null || people.isEmpty()) {
-            showMessage("Sin personas", "No hay personas disponibles para asignar al movimiento.");
+            showMessage(getString(R.string.admin_no_people),
+                getString(R.string.admin_no_people_message));
             return;
         }
         String[] options = new String[people.size()];
-        for (int i = 0; i < people.size(); i++) options[i] = people.get(i).label();
-        new AlertDialog.Builder(this).setTitle("Persona del " + type.toLowerCase(LOCALE))
+        for (int i = 0; i < people.size(); i++) options[i] = people.get(i).label(this);
+        new AlertDialog.Builder(this).setTitle(getString(R.string.admin_person_of,
+                movementLabel(type)))
             .setItems(options, (dialog, index) -> chooseTime(type, people.get(index), null))
-            .setNegativeButton("Cancelar", null).show();
+            .setNegativeButton(R.string.dialog_cancel, null).show();
     }
 
     private void chooseMovement() {
         String[] options = new String[movements.size()];
         for (int i = 0; i < movements.size(); i++) {
             DocumentSnapshot movement = movements.get(i);
-            options[i] = movement.getString("movimiento") + " · " + shownTime(movement)
-                + " · " + movement.getString("persona") + " · ID " + movement.getId();
+            options[i] = getString(R.string.admin_movement_item,
+                movementLabel(value(movement.getString("movimiento"))), shownTime(movement),
+                value(movement.getString("persona")), movement.getId());
         }
-        new AlertDialog.Builder(this).setTitle("Seleccionar movimiento")
+        new AlertDialog.Builder(this).setTitle(R.string.admin_select_movement)
             .setItems(options, (dialog, index) -> chooseAction(movements.get(index)))
-            .setNegativeButton("Cancelar", null).show();
+            .setNegativeButton(R.string.dialog_cancel, null).show();
     }
 
     private void chooseAction(DocumentSnapshot movement) {
-        new AlertDialog.Builder(this).setTitle("Movimiento " + movement.getId())
-            .setItems(new String[]{"Corregir hora", "Quitar movimiento"}, (dialog, index) -> {
+        new AlertDialog.Builder(this).setTitle(getString(R.string.admin_movement_title,
+                movement.getId()))
+            .setItems(new String[]{getString(R.string.admin_correct_time),
+                getString(R.string.admin_remove_movement)}, (dialog, index) -> {
                 if (index == 0) {
                     SelectablePerson person = new SelectablePerson(
                         value(movement.getString("personaId")), value(movement.getString("persona")), false);
                     chooseTime(value(movement.getString("movimiento")), person, movement);
                 } else confirmCancellation(movement);
-            }).setNegativeButton("Cancelar", null).show();
+            }).setNegativeButton(R.string.dialog_cancel, null).show();
     }
 
     private void chooseTime(String type, SelectablePerson person, DocumentSnapshot previous) {
@@ -312,12 +320,15 @@ public final class AdminKeysActivity extends AppCompatActivity {
 
     private void confirmSave(String type, SelectablePerson person, DocumentSnapshot previous,
                              String time) {
-        String action = previous == null ? "Agregar" : "Corregir";
-        new AlertDialog.Builder(this).setTitle(action + " " + type.toLowerCase(LOCALE))
-            .setMessage(action + " " + type.toLowerCase(LOCALE) + " de " + selectedKey.name
-                + " el " + selectedDate + " a las " + time + " · " + person.name + ".")
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Guardar", (dialog, which) ->
+        String action = previous == null ? getString(R.string.admin_add_action)
+            : getString(R.string.admin_correct_action);
+        String typeLabel = movementLabel(type);
+        new AlertDialog.Builder(this).setTitle(getString(R.string.admin_key_action_title,
+                action, typeLabel))
+            .setMessage(getString(R.string.admin_key_action_detail, action, typeLabel,
+                selectedKey.name, selectedDate, time, person.name))
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.dialog_save, (dialog, which) ->
                 saveMovement(type, person, previous, time)).show();
     }
 
@@ -342,20 +353,21 @@ public final class AdminKeysActivity extends AppCompatActivity {
                 SetOptions.merge());
             return id;
         }).addOnSuccessListener(id -> {
-            toast(type + " guardado correctamente");
+            toast(getString(R.string.admin_key_saved, movementLabel(type)));
             loadMovements();
         }).addOnFailureListener(error -> {
             renderMovements();
-            showMessage("No se pudo guardar", friendlyError(error));
+            showMessage(getString(R.string.admin_save_failed), friendlyError(error));
         });
     }
 
     private void confirmCancellation(DocumentSnapshot target) {
-        new AlertDialog.Builder(this).setTitle("Quitar movimiento")
-            .setMessage("Quitar " + target.getString("movimiento") + " de " + selectedKey.name
-                + " del " + selectedDate + " · ID " + target.getId() + "?")
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Sí, quitar", (dialog, which) -> saveCancellation(target)).show();
+        new AlertDialog.Builder(this).setTitle(R.string.admin_remove_movement)
+            .setMessage(getString(R.string.admin_key_remove_detail,
+                movementLabel(value(target.getString("movimiento"))), selectedKey.name,
+                selectedDate, target.getId()))
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.confirm_remove, (dialog, which) -> saveCancellation(target)).show();
     }
 
     private void saveCancellation(DocumentSnapshot target) {
@@ -379,11 +391,11 @@ public final class AdminKeysActivity extends AppCompatActivity {
                 SetOptions.merge());
             return id;
         }).addOnSuccessListener(id -> {
-            toast("Movimiento quitado correctamente");
+            toast(getString(R.string.admin_key_removed));
             loadMovements();
         }).addOnFailureListener(error -> {
             renderMovements();
-            showMessage("No se pudo quitar", friendlyError(error));
+            showMessage(getString(R.string.admin_remove_failed), friendlyError(error));
         });
     }
 
@@ -441,12 +453,13 @@ public final class AdminKeysActivity extends AppCompatActivity {
         return calendar;
     }
 
-    private static String readableDate(String date) {
+    private String readableDate(String date) {
         try {
             Date parsed = new SimpleDateFormat("dd/MM/yyyy", Locale.US).parse(date);
-            String text = new SimpleDateFormat("EEEE d 'de' MMMM 'de' yyyy", LOCALE).format(parsed);
+            String text = new SimpleDateFormat(getString(R.string.date_format_full), LOCALE)
+                .format(parsed);
             return text.substring(0, 1).toUpperCase(LOCALE) + text.substring(1);
-        } catch (Exception ignored) { return "Seleccionar fecha"; }
+        } catch (Exception ignored) { return getString(R.string.select_date); }
     }
 
     private static boolean isValidDate(String date) {
@@ -465,20 +478,28 @@ public final class AdminKeysActivity extends AppCompatActivity {
 
     private static String value(String value) { return value == null ? "" : value; }
 
-    private static String friendlyError(Exception error) {
+    private String friendlyError(Exception error) {
         String message = error.getMessage() == null ? "" : error.getMessage().toUpperCase(Locale.ROOT);
-        if (message.contains("PERMISSION_DENIED")) return "Firebase rechazó el cambio por permisos.";
-        if (message.contains("UNAVAILABLE") || message.contains("NETWORK")) return "No hay conexión.";
-        return "No se pudo completar la operación.";
+        if (message.contains("PERMISSION_DENIED")) return getString(R.string.admin_permission_error);
+        if (message.contains("UNAVAILABLE") || message.contains("NETWORK")) {
+            return getString(R.string.admin_no_connection);
+        }
+        return getString(R.string.admin_operation_failed);
     }
 
     private void showMessage(String title, String message) {
         runOnUiThread(() -> new AlertDialog.Builder(this).setTitle(title).setMessage(message)
-            .setPositiveButton("Aceptar", null).show());
+            .setPositiveButton(R.string.dialog_accept, null).show());
     }
 
     private void toast(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    private String movementLabel(String type) {
+        if ("Devolucion".equals(type)) return getString(R.string.admin_return_label);
+        if ("Retiro".equals(type)) return getString(R.string.admin_withdrawal_label);
+        return type;
     }
 
     private void showLoadError(String source, String title, Exception error, Runnable retry) {
@@ -494,9 +515,9 @@ public final class AdminKeysActivity extends AppCompatActivity {
             }
             AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(title)
-                .setMessage(friendlyError(error) + "\n\nLos datos anteriores seguirán visibles.")
-                .setNegativeButton("Cerrar", null)
-                .setPositiveButton("Reintentar", (ignored, which) -> {
+                .setMessage(friendlyError(error) + "\n\n" + getString(R.string.admin_old_data_visible))
+                .setNegativeButton(R.string.dialog_close, null)
+                .setPositiveButton(R.string.dialog_retry, (ignored, which) -> {
                     loadErrorDialogVisible = false;
                     retriedLoads.add(source);
                     retry.run();

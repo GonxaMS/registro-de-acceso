@@ -75,7 +75,7 @@ public final class AdminDashboardActivity extends AppCompatActivity {
         database = FirebaseFirestore.getInstance();
         AdminAccess.check(database, (allowed, uid) -> {
             if (!allowed) {
-                Toast.makeText(this, "Este dispositivo no tiene permiso de administrador",
+                Toast.makeText(this, getString(R.string.admin_permission_required),
                     Toast.LENGTH_LONG).show();
                 finish();
                 return;
@@ -111,11 +111,12 @@ public final class AdminDashboardActivity extends AppCompatActivity {
     private void updateMonthLabel() {
         try {
             Date date = new SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(selectedMonth);
-            String readable = new SimpleDateFormat("MMMM 'de' yyyy", LOCALE).format(date);
-            monthButton.setText("Mes: " + readable.substring(0, 1).toUpperCase(LOCALE)
-                + readable.substring(1));
+            String readable = new SimpleDateFormat(getString(R.string.date_format_month), LOCALE)
+                .format(date);
+            monthButton.setText(getString(R.string.admin_month_label,
+                readable.substring(0, 1).toUpperCase(LOCALE) + readable.substring(1)));
         } catch (Exception ignored) {
-            monthButton.setText("Seleccionar mes");
+            monthButton.setText(R.string.admin_select_month);
         }
     }
 
@@ -123,14 +124,14 @@ public final class AdminDashboardActivity extends AppCompatActivity {
         rebuildListener = database.collection("comandosAdmin").document("rehacerPlanillas")
             .addSnapshotListener((document, error) -> {
                 if (error != null || document == null || !document.exists()) {
-                    rebuildButton.setText("Rehacer planillas");
+                    rebuildButton.setText(R.string.admin_rebuild_default);
                     return;
                 }
                 String state = value(document.getString("estado"));
-                if ("Pendiente".equals(state)) rebuildButton.setText("Solicitud pendiente…");
-                else if ("Procesando".equals(state)) rebuildButton.setText("Procesando planillas…");
-                else if ("Error".equals(state)) rebuildButton.setText("Reintentar reconstrucción");
-                else rebuildButton.setText("Rehacer planillas");
+                if ("Pendiente".equals(state)) rebuildButton.setText(R.string.admin_rebuild_pending);
+                else if ("Procesando".equals(state)) rebuildButton.setText(R.string.admin_rebuild_processing);
+                else if ("Error".equals(state)) rebuildButton.setText(R.string.admin_rebuild_retry);
+                else rebuildButton.setText(R.string.admin_rebuild_default);
             });
     }
 
@@ -138,21 +139,25 @@ public final class AdminDashboardActivity extends AppCompatActivity {
         syncStatusListener = database.collection("sincronizacion").document("sheets")
             .addSnapshotListener((document, error) -> {
                 if (error != null) {
-                    syncStatus.setText("No se pudo consultar el estado de Sheets");
+                    syncStatus.setText(R.string.admin_sync_status_failed);
                     return;
                 }
                 if (document == null || !document.exists()) {
-                    syncStatus.setText("Sincronización todavía no instalada");
+                    syncStatus.setText(R.string.admin_sync_not_installed);
                     return;
                 }
                 String state = value(document.getString("estado"));
                 String lastError = value(document.getString("ultimoError"));
                 Timestamp lastRun = document.getTimestamp("ultimaEjecucion");
-                String when = lastRun == null ? "sin fecha"
-                    : new SimpleDateFormat("dd/MM/yyyy HH:mm", LOCALE).format(lastRun.toDate());
-                String text = (state.isEmpty() ? "Sin estado" : state)
-                    + "\nÚltima ejecución: " + when;
-                if (!lastError.isEmpty()) text += "\nÚltimo error: " + lastError;
+                String when = lastRun == null ? getString(R.string.admin_sync_no_date)
+                    : new SimpleDateFormat(getString(R.string.date_format_timestamp), LOCALE)
+                        .format(lastRun.toDate());
+                String text = getString(R.string.admin_sync_state,
+                    state.isEmpty() ? getString(R.string.admin_sync_no_state) : state,
+                    getString(R.string.admin_sync_last_run, when));
+                if (!lastError.isEmpty()) {
+                    text += "\n" + getString(R.string.admin_sync_last_error, lastError);
+                }
                 syncStatus.setText(text);
             });
 
@@ -160,7 +165,7 @@ public final class AdminDashboardActivity extends AppCompatActivity {
             .orderBy("ocurrido", Query.Direction.DESCENDING).limit(10)
             .addSnapshotListener((snapshot, error) -> {
                 if (error != null) {
-                    syncErrors.setText("No se pudo consultar el registro de fallos.");
+                    syncErrors.setText(R.string.admin_sync_errors_failed);
                     return;
                 }
                 synchronizationFailures.clear();
@@ -172,7 +177,7 @@ public final class AdminDashboardActivity extends AppCompatActivity {
             .orderBy("ocurrido", Query.Direction.DESCENDING).limit(10)
             .addSnapshotListener((snapshot, error) -> {
                 if (error != null) {
-                    syncErrors.setText("No se pudieron consultar los errores de la app.");
+                    syncErrors.setText(R.string.admin_app_errors_failed);
                     return;
                 }
                 appFailures.clear();
@@ -185,9 +190,9 @@ public final class AdminDashboardActivity extends AppCompatActivity {
         StringBuilder text = new StringBuilder();
         int unresolved = appendPendingErrors(text, appFailures)
             + appendPendingErrors(text, synchronizationFailures);
-        syncErrors.setText(unresolved == 0 ? "Sin errores pendientes."
-            : unresolved + (unresolved == 1 ? " error pendiente\n\n" : " errores pendientes\n\n")
-                + text);
+        syncErrors.setText(unresolved == 0 ? getString(R.string.admin_no_pending_errors)
+            : getString(unresolved == 1 ? R.string.admin_pending_errors_one
+                : R.string.admin_pending_errors_many, unresolved) + text);
         resolveErrorsButton.setEnabled(unresolved > 0);
     }
 
@@ -197,21 +202,22 @@ public final class AdminDashboardActivity extends AppCompatActivity {
             if (Boolean.TRUE.equals(document.getBoolean("resuelto"))) continue;
             unresolved++;
             Timestamp occurred = document.getTimestamp("ocurrido");
-            String when = occurred == null ? "Sin fecha"
-                : new SimpleDateFormat("dd/MM HH:mm", LOCALE).format(occurred.toDate());
+            String when = occurred == null ? getString(R.string.admin_error_no_date)
+                : new SimpleDateFormat(getString(R.string.date_format_short_timestamp), LOCALE)
+                    .format(occurred.toDate());
             if (text.length() > 0) text.append("\n\n");
-            text.append(when).append(" · ").append(value(document.getString("origen")))
-                .append("\n").append(value(document.getString("mensaje")));
+            text.append(getString(R.string.admin_errors_log_date, when,
+                value(document.getString("origen")), value(document.getString("mensaje"))));
         }
         return unresolved;
     }
 
     private void confirmResolveErrors() {
         new AlertDialog.Builder(this)
-            .setTitle("Resolver errores anteriores")
-            .setMessage("Dejarán de aparecer como pendientes, pero permanecerán guardados como historial.")
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Marcar como resueltos", (dialog, which) -> resolveErrors())
+            .setTitle(R.string.admin_resolve_title)
+            .setMessage(R.string.admin_resolve_message)
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.admin_mark_resolved, (dialog, which) -> resolveErrors())
             .show();
     }
 
@@ -234,23 +240,26 @@ public final class AdminDashboardActivity extends AppCompatActivity {
                     }
                     final int resolved = count;
                     if (resolved == 0) {
-                        toast("No hay errores pendientes");
+                        toast(getString(R.string.admin_no_errors_pending));
                         return;
                     }
                     batch.commit()
-                        .addOnSuccessListener(ignored -> toast(resolved + " errores marcados como resueltos"))
-                        .addOnFailureListener(error -> showMessage("No se pudieron resolver", friendlyError(error)));
+                        .addOnSuccessListener(ignored -> toast(getString(R.string.admin_resolved_count,
+                            resolved)))
+                        .addOnFailureListener(error -> showMessage(getString(R.string.admin_resolve_failed),
+                            friendlyError(error)));
                 }).addOnFailureListener(error ->
-                    showMessage("No se pudieron consultar los errores", friendlyError(error))))
-            .addOnFailureListener(error -> showMessage("No se pudieron consultar los errores", friendlyError(error)));
+                    showMessage(getString(R.string.admin_errors_query_failed), friendlyError(error))))
+            .addOnFailureListener(error -> showMessage(getString(R.string.admin_errors_query_failed),
+                friendlyError(error)));
     }
 
     private void confirmRebuildSheets() {
         new AlertDialog.Builder(this)
-            .setTitle("Rehacer planillas")
-            .setMessage("Se volverán a crear las planillas de personal y llaves del mes seleccionado usando los datos de Firebase.")
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Solicitar", (dialog, which) -> requestSheetsRebuild())
+            .setTitle(R.string.admin_rebuild_title)
+            .setMessage(R.string.admin_rebuild_message)
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.admin_request, (dialog, which) -> requestSheetsRebuild())
             .show();
     }
 
@@ -261,26 +270,27 @@ public final class AdminDashboardActivity extends AppCompatActivity {
         request.put("solicitadoPor", ADMIN_USER);
         request.put("solicitado", FieldValue.serverTimestamp());
         database.collection("comandosAdmin").document("rehacerPlanillas").set(request)
-            .addOnSuccessListener(ignored -> toast("Solicitud enviada. Las planillas se reconstruirán pronto"))
-            .addOnFailureListener(error -> showMessage("No se pudo solicitar", friendlyError(error)));
+            .addOnSuccessListener(ignored -> toast(getString(R.string.admin_request_sent)))
+            .addOnFailureListener(error -> showMessage(getString(R.string.admin_request_failed),
+                friendlyError(error)));
     }
 
     private static String value(String text) {
         return text == null ? "" : text.trim();
     }
 
-    private static String friendlyError(Exception error) {
+    private String friendlyError(Exception error) {
         String message = error.getMessage() == null ? "" : error.getMessage().toUpperCase(Locale.ROOT);
         if (message.contains("UNAVAILABLE") || message.contains("NETWORK") || message.contains("TIMEOUT")) {
-            return "No hay conexión. Intenta nuevamente.";
+            return getString(R.string.error_no_connection_retry);
         }
-        if (message.contains("PERMISSION_DENIED")) return "No tienes permiso para realizar esta acción.";
-        return "No se pudo completar la operación. Intenta nuevamente.";
+        if (message.contains("PERMISSION_DENIED")) return getString(R.string.error_no_permission);
+        return getString(R.string.error_operation_failed);
     }
 
     private void showMessage(String title, String message) {
         runOnUiThread(() -> new AlertDialog.Builder(this).setTitle(title).setMessage(message)
-            .setPositiveButton("Aceptar", null).show());
+            .setPositiveButton(R.string.dialog_accept, null).show());
     }
 
     private void toast(String message) {

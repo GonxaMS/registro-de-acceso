@@ -22,7 +22,7 @@
             android:contentDescription="@string/back"
             android:focusable="true"
             android:gravity="center"
-            android:text="‹"
+            android:text="@string/back_symbol"
             android:textColor="@color/white"
             android:textSize="40sp" />
 
@@ -36,7 +36,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Administración"
+                android:text="@string/admin_dashboard_title"
                 android:textColor="@color/white"
                 android:textSize="24sp"
                 android:textStyle="bold" />
@@ -45,7 +45,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="Todo el control en un solo lugar"
+                android:text="@string/admin_dashboard_subtitle"
                 android:textColor="#DDEAFF"
                 android:textSize="14sp" />
         </LinearLayout>
@@ -67,7 +67,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:text="ACCESOS RÁPIDOS"
+                android:text="@string/admin_quick_access"
                 android:textColor="@color/muted"
                 android:textSize="13sp"
                 android:textStyle="bold" />
@@ -79,7 +79,7 @@
                 android:background="@drawable/button_entry"
                 android:gravity="start|center_vertical"
                 android:paddingStart="20dp"
-                android:text="Personal · corregir movimientos"
+                android:text="@string/admin_quick_people"
                 android:textAllCaps="false"
                 android:textColor="@color/white"
                 android:textSize="17sp"
@@ -93,7 +93,7 @@
                 android:background="@drawable/button_keys"
                 android:gravity="start|center_vertical"
                 android:paddingStart="20dp"
-                android:text="Llaves · corregir movimientos"
+                android:text="@string/admin_quick_keys"
                 android:textAllCaps="false"
                 android:textColor="@color/white"
                 android:textSize="17sp"
@@ -106,7 +106,7 @@
                 android:layout_marginTop="10dp"
                 android:gravity="start|center_vertical"
                 android:paddingStart="20dp"
-                android:text="Dispositivos · asignar permisos"
+                android:text="@string/admin_quick_devices"
                 android:textAllCaps="false"
                 android:textSize="17sp"
                 android:textStyle="bold" />
@@ -116,7 +116,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
                 android:layout_marginBottom="8dp"
-                android:text="FIREBASE → SHEETS"
+                android:text="@string/admin_sheets_section"
                 android:textColor="@color/muted"
                 android:textSize="13sp"
                 android:textStyle="bold" />
@@ -131,7 +131,7 @@
                     android:id="@+id/txtDashboardSyncStatus"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Consultando sincronización…"
+                    android:text="@string/admin_sync_loading"
                     android:textColor="@color/text"
                     android:textSize="16sp"
                     android:textStyle="bold" />
@@ -141,7 +141,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:text="Consultando errores…"
+                    android:text="@string/admin_errors_loading"
                     android:textColor="@color/muted"
                     android:textSize="15sp" />
 
@@ -151,7 +151,7 @@
                     android:layout_height="52dp"
                     android:layout_marginTop="14dp"
                     android:enabled="false"
-                    android:text="Marcar errores como resueltos"
+                    android:text="@string/admin_resolve_errors"
                     android:textAllCaps="false"
                     android:textSize="15sp" />
             </LinearLayout>
@@ -165,7 +165,7 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center_vertical"
-                android:text="Seleccionar mes"
+                android:text="@string/admin_select_month"
                 android:textColor="@color/text"
                 android:textSize="17sp"
                 android:textStyle="bold" />
@@ -177,7 +177,7 @@
                 android:layout_marginTop="10dp"
                 android:layout_marginBottom="18dp"
                 android:background="@drawable/button_exit"
-                android:text="Rehacer planillas"
+                android:text="@string/admin_rebuild_sheets"
                 android:textAllCaps="false"
                 android:textColor="@color/white"
                 android:textSize="17sp"

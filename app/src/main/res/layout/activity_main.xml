@@ -62,7 +62,7 @@
                 android:contentDescription="@string/more_options"
                 android:focusable="true"
                 android:gravity="center"
-                android:text="⋮"
+                android:text="@string/more_options_symbol"
                 android:textColor="@color/white"
                 android:textSize="32sp" />
         </LinearLayout>
@@ -85,7 +85,7 @@
                 android:contentDescription="@string/open_sheets"
                 android:focusable="true"
                 android:gravity="center"
-                android:text="📋 Planilla"
+                android:text="@string/planilla_shortcut"
                 android:textColor="@color/white"
                 android:textSize="16sp"
                 android:textStyle="bold" />
@@ -101,7 +101,7 @@
                 android:contentDescription="@string/keys_shortcut"
                 android:focusable="true"
                 android:gravity="center"
-                android:text="🔑 Llaves"
+                android:text="@string/keys_shortcut_button"
                 android:textColor="@color/white"
                 android:textSize="16sp"
                 android:textStyle="bold" />
@@ -123,7 +123,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
             android:layout_marginTop="5dp"
-            android:text="Llaves prestadas: 0"
+            android:text="@string/borrowed_keys_initial"
             android:textColor="#FFD966"
             android:textSize="15sp"
             android:textStyle="bold" />
@@ -177,19 +177,19 @@
             <TextView
                 android:id="@+id/filterPeopleAll"
                 style="@style/FilterChip"
-                android:text="Todos" />
+                android:text="@string/filter_all" />
 
             <TextView
                 android:id="@+id/filterPeopleInside"
                 style="@style/FilterChip"
                 android:layout_marginStart="8dp"
-                android:text="Dentro" />
+                android:text="@string/filter_inside" />
 
             <TextView
                 android:id="@+id/filterPeopleOutside"
                 style="@style/FilterChip"
                 android:layout_marginStart="8dp"
-                android:text="Fuera" />
+                android:text="@string/filter_outside" />
         </LinearLayout>
 
         <TextView

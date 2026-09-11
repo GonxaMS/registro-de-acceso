@@ -20,7 +20,7 @@
             android:clickable="true"
             android:focusable="true"
             android:gravity="center"
-            android:text="‹"
+            android:text="@string/back_symbol"
             android:textColor="@color/white"
             android:textSize="40sp" />
         <LinearLayout
@@ -32,14 +32,14 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Administradores"
+                android:text="@string/admin_devices_title"
                 android:textColor="@color/white"
                 android:textSize="23sp"
                 android:textStyle="bold" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Permisos por dispositivo"
+                android:text="@string/admin_devices_subtitle"
                 android:textColor="#DDEAFF"
                 android:textSize="14sp" />
         </LinearLayout>
@@ -59,7 +59,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="14dp"
-                android:text="Cargando dispositivos…"
+                android:text="@string/admin_devices_loading"
                 android:textColor="@color/muted"
                 android:textSize="16sp" />
             <LinearLayout

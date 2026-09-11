@@ -20,7 +20,7 @@
             android:clickable="true"
             android:focusable="true"
             android:gravity="center"
-            android:text="‹"
+            android:text="@string/back_symbol"
             android:textColor="@color/white"
             android:textSize="40sp" />
         <LinearLayout
@@ -32,14 +32,14 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Admin · Llaves"
+                android:text="@string/admin_keys_title"
                 android:textColor="@color/white"
                 android:textSize="23sp"
                 android:textStyle="bold" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Movimientos de cualquier fecha"
+                android:text="@string/admin_keys_subtitle"
                 android:textColor="#DDEAFF"
                 android:textSize="14sp" />
         </LinearLayout>
@@ -58,7 +58,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="LLAVE"
+                android:text="@string/admin_key_label"
                 android:textColor="@color/muted"
                 android:textStyle="bold" />
             <TextView
@@ -70,7 +70,7 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center_vertical"
-                android:text="Seleccionar llave"
+                android:text="@string/admin_select_key"
                 android:textColor="@color/text"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -78,7 +78,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="18dp"
-                android:text="FECHA DEL MOVIMIENTO"
+                android:text="@string/admin_movement_date_label"
                 android:textColor="@color/muted"
                 android:textStyle="bold" />
             <TextView
@@ -90,7 +90,7 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center_vertical"
-                android:text="Seleccionar fecha"
+                android:text="@string/admin_select_date"
                 android:textColor="@color/text"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -101,7 +101,7 @@
                 android:layout_marginTop="20dp"
                 android:background="@drawable/panel"
                 android:minHeight="100dp"
-                android:text="Selecciona una llave"
+                android:text="@string/admin_select_key_prompt"
                 android:textColor="@color/text"
                 android:textSize="17sp" />
             <Button
@@ -111,7 +111,7 @@
                 android:layout_marginTop="20dp"
                 android:background="@drawable/button_entry"
                 android:enabled="false"
-                android:text="Agregar retiro"
+                android:text="@string/admin_add_withdrawal"
                 android:textAllCaps="false"
                 android:textColor="@color/white"
                 android:textSize="18sp"
@@ -123,7 +123,7 @@
                 android:layout_marginTop="10dp"
                 android:background="@drawable/button_exit"
                 android:enabled="false"
-                android:text="Agregar devolución"
+                android:text="@string/admin_add_return"
                 android:textAllCaps="false"
                 android:textColor="@color/white"
                 android:textSize="18sp"
@@ -134,7 +134,7 @@
                 android:layout_height="58dp"
                 android:layout_marginTop="18dp"
                 android:enabled="false"
-                android:text="Corregir o quitar movimiento"
+                android:text="@string/admin_correct_remove_movement"
                 android:textAllCaps="false"
                 android:textSize="17sp"
                 android:textStyle="bold" />
@@ -142,7 +142,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="18dp"
-                android:text="Cada alta, corrección o anulación conserva el historial y genera un nuevo ID en Firebase."
+                android:text="@string/admin_keys_note"
                 android:textColor="@color/muted"
                 android:textSize="15sp" />
         </LinearLayout>

@@ -64,12 +64,12 @@ final class KeysAdapter extends BaseAdapter {
         boolean pending = actions.isKeyMovementPending(key);
         boolean networkAvailable = actions.isNetworkAvailable();
         holder.name.setText(key.name);
-        holder.status.setText(borrowed ? "● Prestada" : "✓ Disponible");
+        holder.status.setText(borrowed ? R.string.status_borrowed : R.string.status_available);
         holder.status.setTextColor(activity.getColor(
             borrowed ? R.color.gold_dark : R.color.green_dark));
         holder.detail.setText(borrowed
-            ? "La tiene " + key.holder + " desde " + key.date + " " + key.time
-            : "Lista para retirar");
+            ? activity.getString(R.string.key_holder_detail, key.holder, key.date, key.time)
+            : activity.getString(R.string.key_ready_detail));
 
         setEnabled(holder.take, networkAvailable && !pending && !borrowed);
         setEnabled(holder.returnKey, networkAvailable && !pending && borrowed);

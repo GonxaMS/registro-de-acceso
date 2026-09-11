@@ -71,7 +71,8 @@ final class PeopleAdapter extends BaseAdapter {
         boolean networkAvailable = actions.isNetworkAvailable();
 
         holder.name.setText(person.name);
-        holder.status.setText(inside ? "● Dentro" : completed ? "✓ Completado" : "● Fuera");
+        holder.status.setText(inside ? R.string.status_inside
+            : completed ? R.string.status_completed : R.string.status_outside);
         holder.status.setTextColor(activity.getColor(
             inside ? R.color.green_dark : completed ? R.color.blue_dark : R.color.muted));
 

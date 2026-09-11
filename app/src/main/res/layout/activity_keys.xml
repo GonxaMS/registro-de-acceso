@@ -31,7 +31,7 @@
                 android:contentDescription="@string/back"
                 android:focusable="true"
                 android:gravity="center"
-                android:text="‹"
+                android:text="@string/back_symbol"
                 android:textColor="@color/white"
                 android:textSize="40sp" />
 
@@ -70,7 +70,7 @@
                 android:contentDescription="@string/open_sheets"
                 android:focusable="true"
                 android:gravity="center"
-                android:text="📊"
+                android:text="@string/sheet_icon"
                 android:textColor="@color/white"
                 android:textSize="22sp" />
 
@@ -83,7 +83,7 @@
                 android:contentDescription="@string/more_options"
                 android:focusable="true"
                 android:gravity="center"
-                android:text="⋮"
+                android:text="@string/more_options_symbol"
                 android:textColor="@color/white"
                 android:textSize="32sp" />
         </LinearLayout>
@@ -137,19 +137,19 @@
             <TextView
                 android:id="@+id/filterKeysAll"
                 style="@style/FilterChip"
-                android:text="Todas" />
+                android:text="@string/filter_all" />
 
             <TextView
                 android:id="@+id/filterKeysAvailable"
                 style="@style/FilterChip"
                 android:layout_marginStart="8dp"
-                android:text="Disponibles" />
+                android:text="@string/filter_available" />
 
             <TextView
                 android:id="@+id/filterKeysBorrowed"
                 style="@style/FilterChip"
                 android:layout_marginStart="8dp"
-                android:text="Prestadas" />
+                android:text="@string/filter_borrowed" />
         </LinearLayout>
 
         <TextView

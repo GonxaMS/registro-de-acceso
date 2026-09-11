@@ -86,7 +86,8 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
         adapter = new KeysAdapter(this, filteredKeys, this);
         ((ListView) findViewById(R.id.listKeys)).setAdapter(adapter);
         ((TextView) findViewById(R.id.txtKeysToday)).setText(
-            new SimpleDateFormat("EEEE d 'de' MMMM 'de' yyyy", new Locale("es", "AR")).format(new Date())
+            new SimpleDateFormat(getString(R.string.date_format_full), new Locale("es", "AR"))
+                .format(new Date())
         );
         findViewById(R.id.btnBack).setOnClickListener(view -> finish());
         findViewById(R.id.btnKeyMenu).setOnClickListener(this::showMainMenu);
@@ -105,7 +106,7 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
             @Override public void afterTextChanged(Editable text) {}
         });
 
-        count.setText("Cargando llaves…");
+        count.setText(R.string.loading_keys);
         database = FirebaseFirestore.getInstance();
         AdminAccess.checkRole(database, (admin, role) -> {
             if (AdminAccess.BLOCKED.equals(role)) {
@@ -121,7 +122,7 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
 
     private void openSheets() {
         if (BuildConfig.USE_FIREBASE_EMULATOR || AccessActivity.SHEETS_WEB_URL.trim().isEmpty()) {
-            toast("La planilla no está disponible");
+            toast(getString(R.string.sheet_unavailable));
             return;
         }
         startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(AccessActivity.SHEETS_WEB_URL)));
@@ -140,7 +141,8 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
         if (keysListener != null) keysListener.remove();
         keysListener = database.collection("llaves").addSnapshotListener((snapshot, error) -> {
             if (error != null) {
-                showLoadError("Llaves", "No se pudieron cargar las llaves", error, this::listenForKeys);
+                showLoadError(getString(R.string.key_load_title), getString(R.string.key_load_failed),
+                    error, this::listenForKeys);
                 return;
             }
             if (snapshot == null) return;
@@ -168,7 +170,8 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
         if (peopleListener != null) peopleListener.remove();
         peopleListener = database.collection("personal").addSnapshotListener((snapshot, error) -> {
             if (error != null) {
-                showLoadError("Personal para llaves", "No se pudo cargar el personal", error,
+                showLoadError(getString(R.string.people_for_keys_title),
+                    getString(R.string.people_for_keys_failed), error,
                     this::listenForPeople);
                 return;
             }
@@ -191,8 +194,8 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
         keyPeopleListener = database.collection("operariosLlaves")
             .addSnapshotListener((snapshot, error) -> {
                 if (error != null) {
-                    showLoadError("Operarios de llaves",
-                        "No se pudieron cargar los operarios de llaves", error,
+                    showLoadError(getString(R.string.key_workers_title),
+                        getString(R.string.key_workers_failed), error,
                         this::listenForKeyOnlyPeople);
                     return;
                 }
@@ -238,9 +241,9 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
         }
         int borrowed = 0;
         for (KeyItem key : filteredKeys) if ("Prestada".equals(key.state)) borrowed++;
-        count.setText(filteredKeys.size()
-            + (filteredKeys.size() == 1 ? " llave" : " llaves")
-            + " · " + borrowed + " prestadas");
+        count.setText(filteredKeys.size() == 1
+            ? getString(R.string.keys_summary_one, borrowed)
+            : getString(R.string.keys_summary_many, filteredKeys.size(), borrowed));
         adapter.notifyDataSetChanged();
     }
 
@@ -258,7 +261,7 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
 
     @Override public void onKeyMovement(KeyItem key, String type) {
         if (!networkAvailable) {
-            toast("Sin conexion: la operacion esta bloqueada");
+            toast(getString(R.string.offline_operations_blocked));
             return;
         }
         showPersonSelector(key, type);
@@ -280,7 +283,8 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
         boolean take = "Retiro".equals(type);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        EditText input = dialogInput("APELLIDO NOMBRE (ej. PÉREZ JUAN)", take ? "" : key.holder);
+        EditText input = dialogInput(getString(R.string.key_person_name_hint),
+            take ? "" : key.holder);
         input.setSelectAllOnFocus(true);
         ListView list = new ListView(this);
         list.setDividerHeight(1);
@@ -295,7 +299,7 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
             for (SelectablePerson person : selectablePeople) {
                 if (person.name.toLowerCase(Locale.getDefault()).contains(query)) {
                     filtered.add(person);
-                    peopleAdapter.add(person.label());
+                    peopleAdapter.add(person.label(this));
                 }
             }
             peopleAdapter.notifyDataSetChanged();
@@ -310,11 +314,12 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
         content.addView(input, new LinearLayout.LayoutParams(-1, -2));
         content.addView(list, new LinearLayout.LayoutParams(-1, dp(320)));
         AlertDialog dialog = new AlertDialog.Builder(this)
-            .setTitle((take ? "Quien retira " : "Quien devuelve ") + key.name)
-            .setMessage("Elige de la lista o escribe APELLIDO primero y NOMBRE después.")
+            .setTitle(getString(take ? R.string.key_person_title_take : R.string.key_person_title_return,
+                key.name))
+            .setMessage(R.string.key_person_message)
             .setView(padded(content))
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Usar nombre escrito", null)
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.key_written_name_button, null)
             .create();
         list.setOnItemClickListener((parent, view, position, id) -> {
             if (position < 0 || position >= filtered.size()) return;
@@ -326,15 +331,15 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
             .setOnClickListener(view -> {
                 String writtenName = keyPersonName(input.getText().toString());
                 if (writtenName.length() < 2) {
-                    input.setError("Escribe apellido y nombre");
+                    input.setError(R.string.key_name_error);
                     return;
                 }
                 if (!writtenName.contains(" ")) {
-                    input.setError("Escribe APELLIDO primero y NOMBRE después");
+                    input.setError(R.string.key_name_order_error);
                     return;
                 }
                 if (writtenName.length() > 120) {
-                    input.setError("El nombre es demasiado largo");
+                    input.setError(R.string.key_name_too_long);
                     return;
                 }
                 SelectablePerson chosen = null;
@@ -363,16 +368,17 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
         DocumentReference metaReference = database.collection("meta").document("config");
         DocumentReference keyPersonReference = person.id.isEmpty()
             ? database.collection("operariosLlaves").document(keyPersonId(person.name)) : null;
-        toast(take ? "Registrando retiro..." : "Registrando devolucion...");
+        toast(getString(take ? R.string.registering_withdrawal : R.string.registering_return));
 
         database.runTransaction(transaction -> {
             DocumentSnapshot current = transaction.get(keyReference);
             String state = current.getString("estado");
             if (take && "Prestada".equals(state)) {
-                throw new IllegalStateException("La llave ya está prestada a " + current.getString("quienTiene"));
+                throw new IllegalStateException(getString(R.string.key_already_borrowed,
+                    current.getString("quienTiene")));
             }
             if (!take && !"Prestada".equals(state)) {
-                throw new IllegalStateException("La llave ya esta disponible");
+                throw new IllegalStateException(getString(R.string.key_already_available));
             }
 
             DocumentSnapshot config = transaction.get(metaReference);
@@ -431,11 +437,11 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
             finishKeyMovement(key.id);
             adapter.highlightKey(key.id);
             successHaptic();
-            toast((take ? person.name + " retiró " : person.name + " devolvió ") + key.name
-                + " a las " + time);
+            toast(getString(take ? R.string.key_movement_success_take
+                : R.string.key_movement_success_return, person.name, key.name, time));
         }).addOnFailureListener(error -> {
             finishKeyMovement(key.id);
-            showMessage("No se pudo registrar", friendlyError(error));
+            showMessage(getString(R.string.key_register_failed), friendlyError(error));
         });
     }
 
@@ -455,7 +461,7 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
 
     @Override public void onKeyOptions(View anchor, KeyItem key) {
         if (!networkAvailable) {
-            toast("Sin conexion: las operaciones estan bloqueadas");
+            toast(getString(R.string.offline_operations_blocked));
             return;
         }
         PopupMenu menu = new PopupMenu(this, anchor);
@@ -485,23 +491,23 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
     }
 
     private void showAddDialog() {
-        EditText input = dialogInput("Nombre o identificacion de la llave", "");
+        EditText input = dialogInput(getString(R.string.key_name_or_id_hint), "");
         AlertDialog dialog = new AlertDialog.Builder(this)
-            .setTitle("Agregar llave")
+            .setTitle(R.string.add_key_title)
             .setView(padded(input))
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Agregar", null)
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.dialog_add, null)
             .create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
             .setOnClickListener(view -> {
                 String name = cleanName(input.getText().toString());
                 if (name.isEmpty()) {
-                    input.setError("Escribe apellido y nombre");
+                    input.setError(R.string.key_name_required);
                     return;
                 }
                 for (KeyItem key : visibleKeys) {
                     if (key.name.equalsIgnoreCase(name)) {
-                        input.setError("Esta llave ya existe");
+                        input.setError(R.string.key_already_exists);
                         return;
                     }
                 }
@@ -515,8 +521,10 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
         for (KeyItem key : hiddenKeys) {
             if (key.name.equalsIgnoreCase(name)) {
                 database.collection("llaves").document(key.id).update("activo", true)
-                    .addOnSuccessListener(ignored -> toast(key.name + " volvio a la lista"))
-                    .addOnFailureListener(error -> showMessage("No se pudo mostrar", friendlyError(error)));
+                    .addOnSuccessListener(ignored -> toast(getString(R.string.key_hidden_restored,
+                        key.name)))
+                    .addOnFailureListener(error -> showMessage(getString(R.string.error_show_failed),
+                        friendlyError(error)));
                 return;
             }
         }
@@ -542,42 +550,47 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
             transaction.set(database.collection("llaves").document(id), data);
             transaction.set(metaReference, Collections.singletonMap("siguienteLlave", next + 1), SetOptions.merge());
             return name;
-        }).addOnSuccessListener(ignored -> toast(name + " fue agregada"))
-            .addOnFailureListener(error -> showMessage("No se pudo agregar", friendlyError(error)));
+        }).addOnSuccessListener(ignored -> toast(getString(R.string.key_add_confirmation, name)))
+            .addOnFailureListener(error -> showMessage(getString(R.string.error_add_failed),
+                friendlyError(error)));
     }
 
     private void confirmHide(KeyItem key) {
         if ("Prestada".equals(key.state)) {
-            showMessage("No se puede ocultar", "Primero deben devolver " + key.name);
+            showMessage(getString(R.string.key_hide_not_allowed),
+                getString(R.string.key_hide_blocked, key.name));
             return;
         }
         new AlertDialog.Builder(this)
-            .setTitle("Ocultar llave")
-            .setMessage("Quieres ocultar " + key.name + " de la lista?")
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Si, ocultar", (dialog, which) ->
+            .setTitle(R.string.hide_key_title)
+            .setMessage(getString(R.string.key_hide_confirmation, key.name))
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.key_hide_confirm, (dialog, which) ->
                 database.collection("llaves").document(key.id).update("activo", false)
-                    .addOnSuccessListener(ignored -> toast("Llave oculta"))
-                    .addOnFailureListener(error -> showMessage("No se pudo ocultar", friendlyError(error))))
+                    .addOnSuccessListener(ignored -> toast(getString(R.string.key_hidden)))
+                    .addOnFailureListener(error -> showMessage(getString(R.string.error_hide_failed),
+                        friendlyError(error))))
             .show();
     }
 
     private void showHiddenKeys() {
         if (hiddenKeys.isEmpty()) {
-            toast("No hay llaves ocultas");
+            toast(getString(R.string.no_hidden_keys));
             return;
         }
         String[] names = new String[hiddenKeys.size()];
         for (int index = 0; index < names.length; index++) names[index] = hiddenKeys.get(index).name;
         new AlertDialog.Builder(this)
-            .setTitle("Mostrar llaves ocultas")
+            .setTitle(R.string.show_hidden_keys_title)
             .setItems(names, (dialog, index) -> {
                 KeyItem key = hiddenKeys.get(index);
                 database.collection("llaves").document(key.id).update("activo", true)
-                    .addOnSuccessListener(ignored -> toast(key.name + " volvio a la lista"))
-                    .addOnFailureListener(error -> showMessage("No se pudo mostrar", friendlyError(error)));
+                    .addOnSuccessListener(ignored -> toast(getString(R.string.key_hidden_restored,
+                        key.name)))
+                    .addOnFailureListener(error -> showMessage(getString(R.string.error_show_failed),
+                        friendlyError(error)));
             })
-            .setNegativeButton("Cancelar", null)
+            .setNegativeButton(R.string.dialog_cancel, null)
             .show();
     }
 
@@ -594,7 +607,7 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
         return cleanName(value).toUpperCase(new Locale("es", "AR"));
     }
 
-    private static String keyPersonId(String name) {
+    private String keyPersonId(String name) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256")
                 .digest(name.getBytes(StandardCharsets.UTF_8));
@@ -604,14 +617,14 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
             }
             return id.toString();
         } catch (Exception error) {
-            throw new IllegalStateException("No se pudo guardar el nombre");
+            throw new IllegalStateException(getString(R.string.key_save_name_failed));
         }
     }
     private static String cleanName(String value) {
         return value.trim().replaceAll("\\s+", " ");
     }
 
-    private static String friendlyError(Exception error) {
+    private String friendlyError(Exception error) {
         Throwable current = error;
         while (current != null) {
             if (current instanceof IllegalStateException && current.getMessage() != null) {
@@ -621,12 +634,12 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
         }
         String message = error.getMessage() == null ? "" : error.getMessage().toUpperCase(Locale.ROOT);
         if (message.contains("UNAVAILABLE") || message.contains("NETWORK") || message.contains("TIMEOUT")) {
-            return "No hay conexión. Intenta nuevamente.";
+            return getString(R.string.error_no_connection_retry);
         }
         if (message.contains("PERMISSION_DENIED")) {
-            return "No tienes permiso para realizar esta acción.";
+            return getString(R.string.error_no_permission);
         }
-        return "No se pudo completar la operación. Intenta nuevamente.";
+        return getString(R.string.error_operation_failed);
     }
 
     private static String today() {
@@ -658,7 +671,7 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
 
     private void showMessage(String title, String message) {
         runOnUiThread(() -> new AlertDialog.Builder(this)
-            .setTitle(title).setMessage(message).setPositiveButton("Aceptar", null).show());
+            .setTitle(title).setMessage(message).setPositiveButton(R.string.dialog_accept, null).show());
     }
 
     private void showLoadError(String source, String title, Exception error, Runnable retry) {
@@ -674,9 +687,9 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
             }
             AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(title)
-                .setMessage(friendlyError(error) + "\n\nLos datos anteriores seguirán visibles.")
-                .setNegativeButton("Cerrar", null)
-                .setPositiveButton("Reintentar", (ignored, which) -> {
+                .setMessage(friendlyError(error) + "\n\n" + getString(R.string.error_old_data_visible))
+                .setNegativeButton(R.string.dialog_close, null)
+                .setPositiveButton(R.string.dialog_retry, (ignored, which) -> {
                     loadErrorDialogVisible = false;
                     retriedLoads.add(source);
                     retry.run();

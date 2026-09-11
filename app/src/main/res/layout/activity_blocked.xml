@@ -9,14 +9,14 @@
     <ImageView
         android:layout_width="96dp"
         android:layout_height="96dp"
-        android:contentDescription="Acceso bloqueado"
+        android:contentDescription="@string/blocked_content_description"
         android:src="@drawable/app_icon" />
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="24dp"
         android:gravity="center"
-        android:text="Acceso pendiente"
+        android:text="@string/blocked_title"
         android:textColor="@color/white"
         android:textSize="28sp"
         android:textStyle="bold" />
@@ -25,7 +25,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="14dp"
         android:gravity="center"
-        android:text="Solicita permisos al administrador para utilizar esta aplicación."
+        android:text="@string/blocked_message"
         android:textColor="#DDEAFF"
         android:textSize="18sp" />
     <Button
@@ -33,7 +33,7 @@
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:layout_marginTop="32dp"
-        android:text="Volver a comprobar"
+        android:text="@string/blocked_recheck"
         android:textAllCaps="false"
         android:textSize="17sp" />
 </LinearLayout>

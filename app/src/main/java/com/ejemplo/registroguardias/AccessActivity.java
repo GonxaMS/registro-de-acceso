@@ -105,7 +105,8 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
         adapter.setToday(today());
         ((ListView) findViewById(R.id.listPeople)).setAdapter(adapter);
         ((TextView) findViewById(R.id.txtToday)).setText(
-            new SimpleDateFormat("EEEE d 'de' MMMM 'de' yyyy", new Locale("es", "AR")).format(new Date())
+            new SimpleDateFormat(getString(R.string.date_format_full), new Locale("es", "AR"))
+                .format(new Date())
         );
         findViewById(R.id.btnMenu).setOnClickListener(this::showMainMenu);
         findViewById(R.id.btnSheetsShortcut).setOnClickListener(view -> openSheets());
@@ -125,18 +126,19 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
             @Override public void afterTextChanged(Editable text) {}
         });
 
-        count.setText("Cargando operarios…");
+        count.setText(R.string.loading_people);
         authentication = FirebaseAuth.getInstance();
         database = FirebaseFirestore.getInstance();
         if (authentication.getCurrentUser() != null) startListeners();
         else authentication.signInAnonymously()
             .addOnSuccessListener(result -> startListeners())
-            .addOnFailureListener(error -> showMessage("Sin conexión", friendlyError(error)));
+            .addOnFailureListener(error -> showMessage(getString(R.string.error_no_connection_title),
+                friendlyError(error)));
     }
 
     private void openSheets() {
         if (BuildConfig.USE_FIREBASE_EMULATOR || SHEETS_WEB_URL.trim().isEmpty()) {
-            toast("La planilla no está disponible");
+            toast(getString(R.string.sheet_unavailable));
             return;
         }
         startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(SHEETS_WEB_URL)));
@@ -184,7 +186,7 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
     private void listenForPeople() {
         peopleListener = database.collection("personal").addSnapshotListener((snapshot, error) -> {
             if (error != null) {
-                showMessage("No se pudo cargar", friendlyError(error));
+                showMessage(getString(R.string.error_load_failed), friendlyError(error));
                 return;
             }
             if (snapshot == null) return;
@@ -214,7 +216,7 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
     private void listenForBorrowedKeys() {
         keysListener = database.collection("llaves").addSnapshotListener((snapshot, error) -> {
             if (error != null || snapshot == null) {
-                borrowedKeys.setText("Llaves prestadas: --");
+                borrowedKeys.setText(R.string.borrowed_keys_unavailable);
                 return;
             }
             int borrowed = 0;
@@ -223,7 +225,7 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
                 if (active != null && !active) continue;
                 if ("Prestada".equals(document.getString("estado"))) borrowed++;
             }
-            borrowedKeys.setText("Llaves prestadas: " + borrowed);
+            borrowedKeys.setText(getString(R.string.borrowed_keys_count, borrowed));
         });
     }
 
@@ -240,9 +242,9 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
         }
         int inside = 0;
         for (Person person : filteredPeople) if ("Dentro".equals(person.state)) inside++;
-        count.setText(filteredPeople.size()
-            + (filteredPeople.size() == 1 ? " operario" : " operarios")
-            + " · " + inside + " dentro");
+        count.setText(filteredPeople.size() == 1
+            ? getString(R.string.people_summary_one, inside)
+            : getString(R.string.people_summary_many, filteredPeople.size(), inside));
         adapter.notifyDataSetChanged();
     }
 
@@ -268,7 +270,7 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
 
     @Override public void onMovement(Person person, String type) {
         if (!networkAvailable) {
-            toast("Sin conexion: la operacion esta bloqueada");
+            toast(getString(R.string.offline_operations_blocked));
             return;
         }
         if (!pendingMovements.add(person.id)) return;
@@ -277,17 +279,20 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
         String date = today();
         if (entry && "Dentro".equals(person.state)) {
             finishMovement(person.id);
-            showMessage("No se puede registrar", person.name + " ya está dentro");
+            showMessage(getString(R.string.error_register_failed),
+                getString(R.string.person_already_inside, person.name));
             return;
         }
         if (!entry && "Fuera".equals(person.state)) {
             finishMovement(person.id);
-            showMessage("No se puede registrar", "Primero debes registrar el ingreso de " + person.name);
+            showMessage(getString(R.string.error_register_failed),
+                getString(R.string.person_missing_entry, person.name));
             return;
         }
         if (entry && date.equals(person.date) && "Salida".equals(person.lastMovement)) {
             finishMovement(person.id);
-            showMessage("No se puede registrar", person.name + " ya completó el ingreso y la salida de hoy");
+            showMessage(getString(R.string.error_register_failed),
+                getString(R.string.person_completed_today, person.name));
             return;
         }
 
@@ -296,7 +301,7 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
         String registeredBy = currentUser();
         DocumentReference personReference = database.collection("personal").document(person.id);
         DocumentReference metaReference = database.collection("meta").document("config");
-        toast("Registrando…");
+        toast(getString(R.string.registering));
 
         database.runTransaction(transaction -> {
             DocumentSnapshot current = transaction.get(personReference);
@@ -304,12 +309,14 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
             String state = current.getString("estado");
             String lastDate = current.getString("fecha");
             String lastMovement = current.getString("ultimoMovimiento");
-            if (entry && "Dentro".equals(state)) throw new IllegalStateException(person.name + " ya está dentro");
+            if (entry && "Dentro".equals(state)) {
+                throw new IllegalStateException(getString(R.string.person_already_inside, person.name));
+            }
             if (!entry && !"Dentro".equals(state)) {
-                throw new IllegalStateException("Primero debes registrar el ingreso de " + person.name);
+                throw new IllegalStateException(getString(R.string.person_missing_entry, person.name));
             }
             if (entry && date.equals(lastDate) && "Salida".equals(lastMovement)) {
-                throw new IllegalStateException(person.name + " ya completó el ingreso y la salida de hoy");
+                throw new IllegalStateException(getString(R.string.person_completed_today, person.name));
             }
 
             long next = nextNumber(config, "siguienteMovimiento");
@@ -333,10 +340,10 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
             finishMovement(person.id);
             adapter.highlightPerson(person.id);
             successHaptic();
-            toast(type + " registrado a las " + time + " por " + registeredBy);
+            toast(getString(R.string.movement_registered, type, time, registeredBy));
         }).addOnFailureListener(error -> {
             finishMovement(person.id);
-            showMessage("No se puede registrar", friendlyError(error));
+            showMessage(getString(R.string.error_register_failed), friendlyError(error));
         });
     }
 
@@ -374,7 +381,7 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
 
     @Override public void onOptions(View anchor, Person person) {
         if (!networkAvailable) {
-            toast("Sin conexion: las operaciones estan bloqueadas");
+            toast(getString(R.string.offline_operations_blocked));
             return;
         }
         PopupMenu menu = new PopupMenu(this, anchor);
@@ -413,23 +420,23 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
     }
 
     private void showAddDialog() {
-        EditText input = dialogInput("Nombre completo", "");
+        EditText input = dialogInput(getString(R.string.person_name_hint), "");
         AlertDialog dialog = new AlertDialog.Builder(this)
-            .setTitle("Agregar operario")
+            .setTitle(R.string.add_person_title)
             .setView(padded(input))
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Agregar", null)
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.dialog_add, null)
             .create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
             .setOnClickListener(view -> {
                 String name = cleanName(input.getText().toString());
                 if (name.isEmpty()) {
-                    input.setError("Escribe un nombre");
+                    input.setError(R.string.enter_person_name);
                     return;
                 }
                 for (Person person : visiblePeople) {
                     if (person.name.equalsIgnoreCase(name)) {
-                        input.setError("Este operario ya existe");
+                        input.setError(R.string.person_already_exists);
                         return;
                     }
                 }
@@ -444,17 +451,18 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
             if (person.name.equalsIgnoreCase(name)) {
                 database.collection("personal").document(person.id).update("activo", true, "retirado", false)
                     .addOnSuccessListener(ignored -> {
-                        toast(person.name + " volvió a la lista");
+                        toast(getString(R.string.person_returned_to_list, person.name));
                     })
-                    .addOnFailureListener(error -> showMessage("No se pudo mostrar", friendlyError(error)));
+                    .addOnFailureListener(error -> showMessage(getString(R.string.error_show_failed),
+                        friendlyError(error)));
                 return;
             }
         }
 
         for (Person person : removedPeople) {
             if (person.name.equalsIgnoreCase(name)) {
-                showMessage("Operario quitado",
-                    person.name + " fue quitado de la lista y no puede restaurarse desde la app.");
+                showMessage(getString(R.string.person_removed),
+                    getString(R.string.person_removed_message, person.name));
                 return;
             }
         }
@@ -478,87 +486,92 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
             transaction.set(metaReference, Collections.singletonMap("siguienteId", next + 1), SetOptions.merge());
             return person;
         }).addOnSuccessListener(person -> {
-            toast(person.name + " fue agregado");
-        }).addOnFailureListener(error -> showMessage("No se pudo agregar", friendlyError(error)));
+            toast(getString(R.string.person_added, person.name));
+        }).addOnFailureListener(error -> showMessage(getString(R.string.error_add_failed),
+            friendlyError(error)));
     }
 
     private void confirmHide(Person person) {
         if ("Dentro".equals(person.state)) {
-            showMessage("No se puede ocultar", "Primero debes registrar la salida de " + person.name);
+            showMessage(getString(R.string.error_hide_failed),
+                getString(R.string.person_cannot_hide, person.name));
             return;
         }
         new AlertDialog.Builder(this)
-            .setTitle("Ocultar operario")
-            .setMessage("¿Quieres ocultar a " + person.name + " de la lista?")
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Sí, ocultar", (dialog, which) ->
+            .setTitle(R.string.hide_person_title)
+            .setMessage(getString(R.string.hide_person_message, person.name))
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.confirm_hide, (dialog, which) ->
                 database.collection("personal").document(person.id).update("activo", false, "retirado", false)
                     .addOnSuccessListener(ignored -> {
-                        toast("Operario oculto");
+                        toast(getString(R.string.person_hidden));
                     })
-                    .addOnFailureListener(error -> showMessage("No se pudo ocultar", friendlyError(error))))
+                    .addOnFailureListener(error -> showMessage(getString(R.string.error_hide_failed),
+                        friendlyError(error))))
             .show();
     }
 
     private void showHiddenPeople() {
         if (hiddenPeople.isEmpty()) {
-            toast("No hay operarios ocultos");
+            toast(getString(R.string.no_hidden_people));
             return;
         }
         String[] names = new String[hiddenPeople.size()];
         for (int index = 0; index < names.length; index++) names[index] = hiddenPeople.get(index).name;
         new AlertDialog.Builder(this)
-            .setTitle("Mostrar operarios ocultos")
+            .setTitle(R.string.show_hidden_people_title)
             .setItems(names, (dialog, index) -> {
                 Person person = hiddenPeople.get(index);
                 database.collection("personal").document(person.id).update("activo", true, "retirado", false)
                     .addOnSuccessListener(ignored -> {
-                        toast(person.name + " volvió a la lista");
+                        toast(getString(R.string.person_returned_to_list, person.name));
                     })
-                    .addOnFailureListener(error -> showMessage("No se pudo mostrar", friendlyError(error)));
+                    .addOnFailureListener(error -> showMessage(getString(R.string.error_show_failed),
+                        friendlyError(error)));
             })
-            .setNegativeButton("Cancelar", null)
+            .setNegativeButton(R.string.dialog_cancel, null)
             .show();
     }
 
     private void confirmRemove(Person person) {
         if ("Dentro".equals(person.state)) {
-            showMessage("No se puede quitar", "Primero debes registrar la salida de " + person.name);
+            showMessage(getString(R.string.error_remove_failed),
+                getString(R.string.person_cannot_remove, person.name));
             return;
         }
         new AlertDialog.Builder(this)
-            .setTitle("Quitar operario")
-            .setMessage("Quieres quitar a " + person.name
-                + " de la lista? Esta accion no se podra restaurar desde la app.")
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Si, quitar", (dialog, which) ->
+            .setTitle(R.string.remove_person_title)
+            .setMessage(getString(R.string.remove_person_message, person.name))
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.confirm_remove, (dialog, which) ->
                 database.collection("personal").document(person.id)
                     .update("activo", false, "retirado", true, "actualizado", FieldValue.serverTimestamp())
-                    .addOnSuccessListener(ignored -> toast("Operario quitado"))
-                    .addOnFailureListener(error -> showMessage("No se pudo quitar", friendlyError(error))))
+                    .addOnSuccessListener(ignored -> toast(getString(R.string.person_removed)))
+                    .addOnFailureListener(error -> showMessage(getString(R.string.error_remove_failed),
+                        friendlyError(error))))
             .show();
     }
 
     private void showChangeUserDialog() {
-        EditText input = dialogInput("Nombre del usuario", currentUser());
+        EditText input = dialogInput(getString(R.string.settings_user_name_hint), currentUser());
         input.setSelectAllOnFocus(true);
         AlertDialog dialog = new AlertDialog.Builder(this)
-            .setTitle("Cambiar usuario")
-            .setMessage("Los próximos movimientos quedarán registrados con este nombre.")
+            .setTitle(R.string.change_user_title)
+            .setMessage(R.string.change_user_message)
             .setView(padded(input))
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Guardar", null)
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.dialog_save, null)
             .create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
             .setOnClickListener(view -> {
                 String name = cleanName(input.getText().toString());
                 if (name.length() < 2) {
-                    input.setError("Escribe el nombre del usuario");
+                    input.setError(R.string.enter_user_name);
                     return;
                 }
                 preferences.edit().putString(USER_NAME_KEY, name).apply();
                 dialog.dismiss();
-                toast("Usuario cambiado a " + name);
+                toast(getString(R.string.user_changed, name));
             }));
         dialog.show();
     }
@@ -570,7 +583,7 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
 
     private void loadTodayMovements(Person person) {
         String date = today();
-        toast("Buscando horarios de hoy…");
+        toast(getString(R.string.searching_today_movements));
         database.collection("movimientos").whereEqualTo("personalId", person.id).get()
             .addOnSuccessListener(snapshot -> {
                 DailyMovements daily = new DailyMovements();
@@ -591,33 +604,37 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
                 }
                 showMovementChoice(person, daily, date);
             })
-            .addOnFailureListener(error -> showMessage("No se pudieron leer los horarios", friendlyError(error)));
+            .addOnFailureListener(error -> showMessage(getString(R.string.error_read_schedules),
+                friendlyError(error)));
     }
 
     private void startCancellation(Person person, String type) {
         String date = today();
-        toast("Verificando registro de hoy…");
+        toast(getString(R.string.checking_today_record));
         database.collection("movimientos").whereEqualTo("personalId", person.id).get()
             .addOnSuccessListener(snapshot -> {
                 DailyMovements daily = effectiveMovements(snapshot.getDocuments(), date);
                 DocumentSnapshot target = "Ingreso".equals(type) ? daily.entry : daily.exit;
                 if (target == null) {
-                    showMessage("No se puede quitar", "No hay " + type.toLowerCase(Locale.getDefault())
-                        + " registrado hoy para " + person.name);
+                    showMessage(getString(R.string.error_remove_failed),
+                        getString(R.string.no_movement_today,
+                            type.toLowerCase(Locale.getDefault()), person.name));
                     return;
                 }
                 if ("Ingreso".equals(type) && daily.exit != null) {
-                    showMessage("No se puede quitar el ingreso",
-                        "Primero debes quitar la salida de hoy, porque depende de ese ingreso.");
+                    showMessage(getString(R.string.cannot_remove_entry),
+                        getString(R.string.remove_entry_first));
                     return;
                 }
                 if ("Salida".equals(type) && daily.entry == null) {
-                    showMessage("No se puede quitar la salida", "No se encontró el ingreso de hoy.");
+                    showMessage(getString(R.string.cannot_remove_exit),
+                        getString(R.string.missing_entry_today));
                     return;
                 }
                 confirmCancellation(person, type, target, daily, date);
             })
-            .addOnFailureListener(error -> showMessage("No se pudieron leer los horarios", friendlyError(error)));
+            .addOnFailureListener(error -> showMessage(getString(R.string.error_read_schedules),
+                friendlyError(error)));
     }
 
     private DailyMovements effectiveMovements(List<DocumentSnapshot> documents, String date) {
@@ -642,29 +659,30 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
     private void confirmCancellation(Person person, String type, DocumentSnapshot target,
                                      DailyMovements daily, String date) {
         new AlertDialog.Builder(this)
-            .setTitle("Quitar " + type.toLowerCase(Locale.getDefault()))
-            .setMessage("¿Quieres quitar el " + type.toLowerCase(Locale.getDefault()) + " de "
-                + person.name + " registrado a las " + shownTime(target) + "?")
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Sí, quitar", (dialog, which) ->
+            .setTitle(getString(R.string.remove_movement_title,
+                type.toLowerCase(Locale.getDefault())))
+            .setMessage(getString(R.string.remove_movement_message,
+                type.toLowerCase(Locale.getDefault()), person.name, shownTime(target)))
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.confirm_remove, (dialog, which) ->
                 saveCancellation(person, type, target, daily, date))
             .show();
     }
 
     private void saveCancellation(Person person, String type, DocumentSnapshot target,
                                   DailyMovements daily, String date) {
-        toast("Quitando " + type.toLowerCase(Locale.getDefault()) + "…");
+        toast(getString(R.string.removing_movement, type.toLowerCase(Locale.getDefault())));
         DocumentReference metaReference = database.collection("meta").document("config");
         DocumentReference personReference = database.collection("personal").document(person.id);
         String registeredBy = currentUser();
         database.runTransaction(transaction -> {
             DocumentSnapshot current = transaction.get(personReference);
             if ("Ingreso".equals(type) && !"Dentro".equals(current.getString("estado"))) {
-                throw new IllegalStateException("El ingreso ya no puede quitarse");
+                throw new IllegalStateException(getString(R.string.cannot_remove_entry));
             }
             if ("Salida".equals(type) && (!"Fuera".equals(current.getString("estado"))
                 || !"Salida".equals(current.getString("ultimoMovimiento")))) {
-                throw new IllegalStateException("La salida ya no puede quitarse");
+                throw new IllegalStateException(getString(R.string.cannot_remove_exit));
             }
             DocumentSnapshot config = transaction.get(metaReference);
             long next = nextNumber(config, "siguienteMovimiento");
@@ -692,8 +710,9 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
             transaction.update(personReference, personUpdate);
             return cancellationId;
         }).addOnSuccessListener(cancellationId ->
-            toast(type + " de hoy fue quitado por " + registeredBy))
-            .addOnFailureListener(error -> showMessage("No se pudo quitar", friendlyError(error)));
+            toast(getString(R.string.movement_removed_today, type, registeredBy)))
+            .addOnFailureListener(error -> showMessage(getString(R.string.error_remove_failed),
+                friendlyError(error)));
     }
     private static DocumentSnapshot newer(DocumentSnapshot current, DocumentSnapshot candidate) {
         if (current == null) return candidate;
@@ -707,22 +726,22 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
 
     private void showMovementChoice(Person person, DailyMovements daily, String date) {
         if (daily.entry == null && daily.exit == null) {
-            showMessage("Sin horarios para modificar",
-                "Todavía no hay ingresos ni salidas registrados hoy para " + person.name);
+            showMessage(getString(R.string.no_schedule_to_modify),
+                getString(R.string.no_today_schedules, person.name));
             return;
         }
         if (daily.entry != null && daily.exit != null) {
             String[] options = {
-                "Hora de ingreso · " + shownTime(daily.entry),
-                "Hora de salida · " + shownTime(daily.exit)
+                getString(R.string.entry_time_label, shownTime(daily.entry)),
+                getString(R.string.exit_time_label, shownTime(daily.exit))
             };
             new AlertDialog.Builder(this)
-                .setTitle("Modificar hora de " + person.name)
+                .setTitle(getString(R.string.modify_time_title, person.name))
                 .setItems(options, (dialog, index) -> {
                     if (index == 0) openTimePicker(person, "Ingreso", daily.entry, daily, date);
                     else openTimePicker(person, "Salida", daily.exit, daily, date);
                 })
-                .setNegativeButton("Cancelar", null)
+                .setNegativeButton(R.string.dialog_cancel, null)
                 .show();
             return;
         }
@@ -742,12 +761,14 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
             int selected = hour * 60 + minute;
             if ("Ingreso".equals(type) && daily.exit != null
                 && selected >= minutes(shownTime(daily.exit))) {
-                showMessage("Hora incorrecta", "El ingreso debe ser anterior a la salida");
+                showMessage(getString(R.string.invalid_time_title),
+                    getString(R.string.invalid_entry_time));
                 return;
             }
             if ("Salida".equals(type) && daily.entry != null
                 && selected <= minutes(shownTime(daily.entry))) {
-                showMessage("Hora incorrecta", "La salida debe ser posterior al ingreso");
+                showMessage(getString(R.string.invalid_time_title),
+                    getString(R.string.invalid_exit_time));
                 return;
             }
             String newTime = String.format(Locale.US, "%02d:%02d", hour, minute);
@@ -758,17 +779,17 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
     private void confirmTimeChange(Person person, String type, DocumentSnapshot previous,
                                    String date, String newTime) {
         new AlertDialog.Builder(this)
-            .setTitle("Confirmar nueva hora")
-            .setMessage(type + " de " + person.name + " a las " + newTime)
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Guardar", (dialog, which) ->
+            .setTitle(R.string.confirm_new_time)
+            .setMessage(getString(R.string.new_time_message, type, person.name, newTime))
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.dialog_save, (dialog, which) ->
                 saveCorrectedTime(person, type, previous, date, newTime))
             .show();
     }
 
     private void saveCorrectedTime(Person person, String type, DocumentSnapshot previous,
                                    String date, String newTime) {
-        toast("Guardando corrección…");
+        toast(getString(R.string.saving_correction));
         DocumentReference metaReference = database.collection("meta").document("config");
         String registeredBy = currentUser();
         database.runTransaction(transaction -> {
@@ -790,8 +811,9 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
             }
             return correctionId;
         }).addOnSuccessListener(correctionId ->
-            toast(type + " actualizado a las " + newTime + " por " + registeredBy))
-            .addOnFailureListener(error -> showMessage("No se pudo modificar la hora", friendlyError(error)));
+            toast(getString(R.string.movement_updated, type, newTime, registeredBy)))
+            .addOnFailureListener(error -> showMessage(getString(R.string.error_modify_failed),
+                friendlyError(error)));
     }
 
     private static String shownTime(DocumentSnapshot document) {
@@ -821,7 +843,7 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
         return value.trim().replaceAll("\\s+", " ");
     }
 
-    private static String friendlyError(Exception error) {
+    private String friendlyError(Exception error) {
         Throwable current = error;
         while (current != null) {
             if (current instanceof IllegalStateException && current.getMessage() != null) {
@@ -831,12 +853,12 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
         }
         String message = error.getMessage() == null ? "" : error.getMessage().toUpperCase(Locale.ROOT);
         if (message.contains("UNAVAILABLE") || message.contains("NETWORK") || message.contains("TIMEOUT")) {
-            return "No hay conexión. Intenta nuevamente.";
+            return getString(R.string.error_no_connection_retry);
         }
         if (message.contains("PERMISSION_DENIED")) {
-            return "No tienes permiso para realizar esta acción.";
+            return getString(R.string.error_no_permission);
         }
-        return "No se pudo completar la operación. Intenta nuevamente.";
+        return getString(R.string.error_operation_failed);
     }
 
     private static String today() {
@@ -864,7 +886,7 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
 
     private void showMessage(String title, String message) {
         runOnUiThread(() -> new AlertDialog.Builder(this)
-            .setTitle(title).setMessage(message).setPositiveButton("Aceptar", null).show());
+            .setTitle(title).setMessage(message).setPositiveButton(R.string.dialog_accept, null).show());
     }
 
     private void toast(String message) {

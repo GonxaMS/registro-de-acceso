@@ -84,7 +84,7 @@ public final class AdminCorrectionsActivity extends AppCompatActivity {
         database = FirebaseFirestore.getInstance();
         AdminAccess.check(database, (allowed, uid) -> {
             if (!allowed) {
-                Toast.makeText(this, "Este dispositivo no tiene permiso de administrador\nUID: " + uid,
+                Toast.makeText(this, getString(R.string.admin_permission_uid, uid),
                     Toast.LENGTH_LONG).show();
                 finish();
                 return;
@@ -104,10 +104,10 @@ public final class AdminCorrectionsActivity extends AppCompatActivity {
     }
 
     private void listenForPeople() {
-        subtitle.setText("Cargando operarios…");
+        subtitle.setText(R.string.admin_corrections_loading);
         peopleListener = database.collection("personal").addSnapshotListener((snapshot, error) -> {
             if (error != null) {
-                showMessage("No se pudo cargar", friendlyError(error));
+                showMessage(getString(R.string.error_load_failed), friendlyError(error));
                 return;
             }
             if (snapshot == null) return;
@@ -132,8 +132,9 @@ public final class AdminCorrectionsActivity extends AppCompatActivity {
 
             int pending = 0;
             for (AdminPerson person : people) if (isPending(person)) pending++;
-            subtitle.setText(pending == 0 ? "Sin jornadas pendientes"
-                : pending + (pending == 1 ? " jornada pendiente" : " jornadas pendientes"));
+            subtitle.setText(pending == 0 ? getString(R.string.admin_corrections_no_pending)
+                : pending == 1 ? getString(R.string.admin_corrections_pending_one)
+                    : getString(R.string.admin_corrections_pending_many, pending));
             updateSelectionLabels();
             loadDailyMovements();
         });
@@ -155,24 +156,25 @@ public final class AdminCorrectionsActivity extends AppCompatActivity {
 
     private void choosePerson() {
         if (people.isEmpty()) {
-            showMessage("Sin operarios", "No hay operarios disponibles para corregir.");
+            showMessage(getString(R.string.admin_no_operators),
+                getString(R.string.admin_no_operators_message));
             return;
         }
         String[] options = new String[people.size()];
         for (int index = 0; index < people.size(); index++) {
             AdminPerson person = people.get(index);
-            options[index] = person.name + (isPending(person)
-                ? "  ·  pendiente desde " + person.date : "");
+            options[index] = isPending(person)
+                ? getString(R.string.admin_pending_since, person.name, person.date) : person.name;
         }
         new AlertDialog.Builder(this)
-            .setTitle("Seleccionar operario")
+            .setTitle(R.string.admin_select_operator)
             .setItems(options, (dialog, index) -> {
                 selectedPerson = people.get(index);
                 if (isPending(selectedPerson)) selectedDate = selectedPerson.date;
                 updateSelectionLabels();
                 loadDailyMovements();
             })
-            .setNegativeButton("Cancelar", null)
+            .setNegativeButton(R.string.dialog_cancel, null)
             .show();
     }
 
@@ -186,15 +188,16 @@ public final class AdminCorrectionsActivity extends AppCompatActivity {
             updateSelectionLabels();
             loadDailyMovements();
         }, initial.get(Calendar.YEAR), initial.get(Calendar.MONTH), initial.get(Calendar.DAY_OF_MONTH));
-        dialog.setTitle("Fecha del movimiento");
+        dialog.setTitle(R.string.admin_movement_date);
         dialog.show();
     }
 
     private void updateSelectionLabels() {
-        personButton.setText(selectedPerson == null ? "Seleccionar operario" : selectedPerson.name);
+        personButton.setText(selectedPerson == null ? getString(R.string.admin_select_operator)
+            : selectedPerson.name);
         dateButton.setText(readableDate(selectedDate));
-        dayTitle.setText(selectedPerson == null ? "Registro del día"
-            : "Registro de " + selectedPerson.name);
+        dayTitle.setText(selectedPerson == null ? getString(R.string.admin_record_day)
+            : getString(R.string.admin_record_of, selectedPerson.name));
     }
 
     private void loadDailyMovements() {
@@ -205,8 +208,8 @@ public final class AdminCorrectionsActivity extends AppCompatActivity {
         }
         loading = true;
         setActionsEnabled(false);
-        entryText.setText("Ingreso  buscando…");
-        exitText.setText("Salida     buscando…");
+        entryText.setText(R.string.admin_entry_searching);
+        exitText.setText(R.string.admin_exit_searching);
         database.collection("movimientos").whereEqualTo("personalId", selectedPerson.id).get()
             .addOnSuccessListener(snapshot -> {
                 daily = effectiveMovements(snapshot.getDocuments(), selectedDate);
@@ -222,7 +225,7 @@ public final class AdminCorrectionsActivity extends AppCompatActivity {
             .addOnFailureListener(error -> {
                 loading = false;
                 renderDaily();
-                showMessage("No se pudo leer el registro", friendlyError(error));
+                showMessage(getString(R.string.admin_read_record_failed), friendlyError(error));
             });
     }
 
@@ -248,14 +251,13 @@ public final class AdminCorrectionsActivity extends AppCompatActivity {
     private void renderDaily() {
         String entry = daily.entry == null ? daily.fallbackEntryTime : shownTime(daily.entry);
         String exit = daily.exit == null ? "" : shownTime(daily.exit);
-        entryText.setText(entry.isEmpty() ? "Ingreso  sin registrar" : "Ingreso  " + entry
-            + (daily.entry == null
-                ? "  ·  recuperado del estado  ·  sin ID"
-                : "  ·  ID " + daily.entry.getId()));
-        exitText.setText(exit.isEmpty() ? "Salida     sin registrar"
-            : "Salida     " + exit + "  ·  ID " + daily.exit.getId());
-        entryButton.setText(daily.entry == null ? "Agregar ingreso" : "Corregir ingreso");
-        exitButton.setText(daily.exit == null ? "Agregar salida" : "Corregir salida");
+        if (entry.isEmpty()) entryText.setText(R.string.admin_entry_unregistered);
+        else if (daily.entry == null) entryText.setText(getString(R.string.admin_entry_recovered, entry));
+        else entryText.setText(getString(R.string.admin_entry_with_id, entry, daily.entry.getId()));
+        if (exit.isEmpty()) exitText.setText(R.string.admin_exit_unregistered);
+        else exitText.setText(getString(R.string.admin_exit_with_id, exit, daily.exit.getId()));
+        entryButton.setText(daily.entry == null ? R.string.admin_add_entry : R.string.admin_correct_entry);
+        exitButton.setText(daily.exit == null ? R.string.admin_add_exit : R.string.admin_correct_exit);
         setActionsEnabled(!loading && selectedPerson != null && isValidDate(selectedDate));
     }
 
@@ -288,35 +290,39 @@ public final class AdminCorrectionsActivity extends AppCompatActivity {
         String entry = daily.entry == null ? daily.fallbackEntryTime : shownTime(daily.entry);
         String exit = daily.exit == null ? "" : shownTime(daily.exit);
         if ("Ingreso".equals(type) && !exit.isEmpty() && selected >= minutes(exit)) {
-            showMessage("Hora incorrecta", "El ingreso debe ser anterior a la salida.");
+            showMessage(getString(R.string.admin_invalid_time),
+                getString(R.string.admin_entry_before_exit));
             return false;
         }
         if ("Salida".equals(type) && !entry.isEmpty() && selected <= minutes(entry)) {
-            showMessage("Hora incorrecta", "La salida debe ser posterior al ingreso.");
+            showMessage(getString(R.string.admin_invalid_time),
+                getString(R.string.admin_exit_after_entry));
             return false;
         }
         return true;
     }
 
     private void confirmSave(String type, DocumentSnapshot previous, String time) {
-        String action = previous == null ? "Agregar" : "Corregir";
-        String detail = action + " " + type.toLowerCase(LOCALE) + " de " + selectedPerson.name
-            + " el " + selectedDate + " a las " + time + ".";
+        String action = previous == null ? getString(R.string.admin_add_action)
+            : getString(R.string.admin_correct_action);
+        String typeLabel = movementLabel(type);
+        String detail = getString(R.string.admin_save_detail, action, typeLabel,
+            selectedPerson.name, selectedDate, time);
         if ("Salida".equals(type) && isPending(selectedPerson)
             && selectedDate.equals(selectedPerson.date)) {
-            detail += " Esto cerrará la jornada pendiente y permitirá un nuevo ingreso.";
+            detail += " " + getString(R.string.admin_save_pending_note);
         }
         new AlertDialog.Builder(this)
-            .setTitle(action + " " + type.toLowerCase(LOCALE))
+            .setTitle(getString(R.string.admin_action_title, action, typeLabel))
             .setMessage(detail)
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Guardar", (dialog, which) -> saveMovement(type, previous, time))
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.dialog_save, (dialog, which) -> saveMovement(type, previous, time))
             .show();
     }
 
     private void saveMovement(String type, DocumentSnapshot previous, String time) {
         setActionsEnabled(false);
-        toast("Guardando corrección…");
+        toast(getString(R.string.admin_save_correction));
         AdminPerson chosenPerson = selectedPerson;
         String chosenDate = selectedDate;
         DocumentReference personReference = database.collection("personal").document(chosenPerson.id);
@@ -360,35 +366,36 @@ public final class AdminCorrectionsActivity extends AppCompatActivity {
             }
             return new SaveResult(movementId);
         }).addOnSuccessListener(result -> {
-            toast(type + " del " + chosenDate + " guardado a las " + time);
+            toast(getString(R.string.admin_save_movement_success, movementLabel(type),
+                chosenDate, time));
             loadDailyMovements();
         }).addOnFailureListener(error -> {
             renderDaily();
-            showMessage("No se pudo guardar", friendlyError(error));
+            showMessage(getString(R.string.admin_save_failed), friendlyError(error));
         });
     }
 
     private void confirmCancellation(String type, DocumentSnapshot target) {
         if (loading || selectedPerson == null || target == null) return;
         if ("Ingreso".equals(type) && daily.exit != null) {
-            showMessage("No se puede quitar el ingreso",
-                "Primero debes quitar la salida de ese día, porque depende del ingreso.");
+            showMessage(getString(R.string.admin_remove_entry_blocked),
+                getString(R.string.admin_remove_entry_message));
             return;
         }
-        String detail = "Quitar el " + type.toLowerCase(LOCALE) + " de "
-            + selectedPerson.name + " del " + selectedDate + " a las " + shownTime(target)
-            + ". El movimiento original conservará su ID y quedará anulado por un nuevo movimiento.";
+        String typeLabel = movementLabel(type);
+        String detail = getString(R.string.admin_remove_movement_detail, typeLabel,
+            selectedPerson.name, selectedDate, shownTime(target));
         new AlertDialog.Builder(this)
-            .setTitle("Quitar " + type.toLowerCase(LOCALE))
+            .setTitle(getString(R.string.admin_remove_title, typeLabel))
             .setMessage(detail)
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Sí, quitar", (dialog, which) -> saveCancellation(type, target))
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.confirm_remove, (dialog, which) -> saveCancellation(type, target))
             .show();
     }
 
     private void saveCancellation(String type, DocumentSnapshot target) {
         setActionsEnabled(false);
-        toast("Quitando " + type.toLowerCase(LOCALE) + "…");
+        toast(getString(R.string.admin_remove_correction_progress, movementLabel(type)));
         AdminPerson chosenPerson = selectedPerson;
         String chosenDate = selectedDate;
         DocumentReference personReference = database.collection("personal").document(chosenPerson.id);
@@ -432,11 +439,11 @@ public final class AdminCorrectionsActivity extends AppCompatActivity {
             }
             return new SaveResult(cancellationId);
         }).addOnSuccessListener(result -> {
-            toast(type + " del " + chosenDate + " fue quitado");
+            toast(getString(R.string.admin_remove_movement_success, movementLabel(type), chosenDate));
             loadDailyMovements();
         }).addOnFailureListener(error -> {
             renderDaily();
-            showMessage("No se pudo quitar", friendlyError(error));
+            showMessage(getString(R.string.admin_remove_failed), friendlyError(error));
         });
     }
 
@@ -505,15 +512,16 @@ public final class AdminCorrectionsActivity extends AppCompatActivity {
         return calendar;
     }
 
-    private static String readableDate(String date) {
+    private String readableDate(String date) {
         try {
             Date parsed = new SimpleDateFormat("dd/MM/yyyy", Locale.US).parse(date);
             if (parsed != null) {
-                String text = new SimpleDateFormat("EEEE d 'de' MMMM 'de' yyyy", LOCALE).format(parsed);
+                String text = new SimpleDateFormat(getString(R.string.date_format_full), LOCALE)
+                    .format(parsed);
                 return text.substring(0, 1).toUpperCase(LOCALE) + text.substring(1);
             }
         } catch (Exception ignored) {}
-        return "Seleccionar fecha";
+        return getString(R.string.select_date);
     }
 
     private static boolean isPreviousDate(String date) {
@@ -549,7 +557,7 @@ public final class AdminCorrectionsActivity extends AppCompatActivity {
         calendar.set(Calendar.MILLISECOND, 0);
     }
 
-    private static String friendlyError(Exception error) {
+    private String friendlyError(Exception error) {
         Throwable current = error;
         while (current != null) {
             if (current instanceof IllegalStateException && current.getMessage() != null) {
@@ -559,21 +567,26 @@ public final class AdminCorrectionsActivity extends AppCompatActivity {
         }
         String message = error.getMessage() == null ? "" : error.getMessage().toUpperCase(Locale.ROOT);
         if (message.contains("UNAVAILABLE") || message.contains("NETWORK") || message.contains("TIMEOUT")) {
-            return "No hay conexión. Intenta nuevamente.";
+            return getString(R.string.error_no_connection_retry);
         }
         if (message.contains("PERMISSION_DENIED")) {
-            return "No tienes permiso para realizar esta acción.";
+            return getString(R.string.error_no_permission);
         }
-        return "No se pudo completar la operación. Intenta nuevamente.";
+        return getString(R.string.error_operation_failed);
     }
 
     private void showMessage(String title, String message) {
         runOnUiThread(() -> new AlertDialog.Builder(this)
-            .setTitle(title).setMessage(message).setPositiveButton("Aceptar", null).show());
+            .setTitle(title).setMessage(message).setPositiveButton(R.string.dialog_accept, null).show());
     }
 
     private void toast(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    private String movementLabel(String type) {
+        return ("Ingreso".equals(type) ? getString(R.string.entry) : getString(R.string.exit))
+            .toLowerCase(LOCALE);
     }
 
     @Override protected void onResume() {

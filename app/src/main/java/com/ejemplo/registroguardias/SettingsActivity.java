@@ -127,7 +127,7 @@ public final class SettingsActivity extends AppCompatActivity {
                 dialog.dismiss();
                 render();
             })
-            .setNegativeButton("Cancelar", null)
+            .setNegativeButton(R.string.dialog_cancel, null)
             .show();
     }
 
@@ -151,7 +151,7 @@ public final class SettingsActivity extends AppCompatActivity {
             .setOnClickListener(view -> {
                 String name = cleanName(input.getText().toString());
                 if (name.length() < 2) {
-                    input.setError("Escribe el nombre del usuario");
+                    input.setError(R.string.setup_user_error);
                     return;
                 }
                 AppPreferences.get(this).edit()

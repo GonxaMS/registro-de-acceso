@@ -26,7 +26,7 @@
             android:contentDescription="@string/back"
             android:focusable="true"
             android:gravity="center"
-            android:text="‹"
+            android:text="@string/back_symbol"
             android:textColor="@color/white"
             android:textSize="40sp" />
 
@@ -76,7 +76,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Selecciona un operario y un día anterior. Los cambios quedan asentados sin borrar el registro original."
+                android:text="@string/admin_corrections_description"
                 android:textColor="@color/muted"
                 android:textSize="16sp"
                 android:lineSpacingExtra="3dp" />
@@ -86,7 +86,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="22dp"
                 android:layout_marginBottom="7dp"
-                android:text="OPERARIO"
+                android:text="@string/admin_operator_label"
                 android:textColor="@color/muted"
                 android:textSize="13sp"
                 android:textStyle="bold" />
@@ -109,7 +109,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="18dp"
                 android:layout_marginBottom="7dp"
-                android:text="FECHA DEL MOVIMIENTO"
+                android:text="@string/admin_movement_date_label"
                 android:textColor="@color/muted"
                 android:textSize="13sp"
                 android:textStyle="bold" />
@@ -138,7 +138,7 @@
                     android:id="@+id/txtAdminDayTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Registro del día"
+                    android:text="@string/admin_day_record"
                     android:textColor="@color/text"
                     android:textSize="19sp"
                     android:textStyle="bold" />
@@ -148,7 +148,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:text="Ingreso  —"
+                    android:text="@string/admin_entry_dash"
                     android:textColor="@color/text"
                     android:textSize="18sp" />
 
@@ -157,7 +157,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:text="Salida     —"
+                    android:text="@string/admin_exit_dash"
                     android:textColor="@color/text"
                     android:textSize="18sp" />
             </LinearLayout>
@@ -169,7 +169,7 @@
                 android:layout_marginTop="22dp"
                 android:background="@drawable/button_entry"
                 android:enabled="false"
-                android:text="Agregar ingreso"
+                android:text="@string/admin_add_entry"
                 android:textAllCaps="false"
                 android:textColor="@color/white"
                 android:textSize="18sp"
@@ -182,7 +182,7 @@
                 android:layout_marginTop="12dp"
                 android:background="@drawable/button_exit"
                 android:enabled="false"
-                android:text="Agregar salida"
+                android:text="@string/admin_add_exit"
                 android:textAllCaps="false"
                 android:textColor="@color/white"
                 android:textSize="18sp"
@@ -195,7 +195,7 @@
                 android:layout_marginTop="20dp"
                 android:background="@drawable/button_exit"
                 android:enabled="false"
-                android:text="Quitar ingreso"
+                android:text="@string/admin_remove_entry"
                 android:textAllCaps="false"
                 android:textColor="@color/white"
                 android:textSize="17sp"
@@ -208,7 +208,7 @@
                 android:layout_marginTop="10dp"
                 android:background="@drawable/button_exit"
                 android:enabled="false"
-                android:text="Quitar salida"
+                android:text="@string/admin_remove_exit"
                 android:textAllCaps="false"
                 android:textColor="@color/white"
                 android:textSize="17sp"
@@ -219,7 +219,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="18dp"
-                android:text="Admin puede agregar, corregir o quitar ingresos y salidas de cualquier fecha pasada, actual o futura. Cada cambio genera un nuevo ID y conserva el historial en Firebase."
+                android:text="@string/admin_corrections_note"
                 android:textColor="@color/muted"
                 android:textSize="15sp"
                 android:lineSpacingExtra="3dp" />
