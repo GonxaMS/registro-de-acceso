@@ -1,17 +1,19 @@
 package com.ejemplo.registroguardias;
 
-import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.EditText;
 
-public final class SetupActivity extends Activity {
+import androidx.appcompat.app.AppCompatActivity;
+
+public final class SetupActivity extends AppCompatActivity {
     private SharedPreferences preferences;
     private EditText input;
 
     @Override public void onCreate(Bundle state) {
+        ThemeMode.apply(this);
         super.onCreate(state);
         preferences = getSharedPreferences(AccessActivity.PREFS_NAME, MODE_PRIVATE);
         if (!currentUser().isEmpty()) {

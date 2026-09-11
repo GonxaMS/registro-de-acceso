@@ -1,6 +1,5 @@
 package com.ejemplo.registroguardias;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -16,6 +15,8 @@ import android.widget.ListView;
 import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
@@ -38,7 +39,7 @@ import java.util.Map;
 import java.util.HashSet;
 import java.util.Set;
 
-public final class KeysActivity extends Activity implements KeysAdapter.Actions {
+public final class KeysActivity extends AppCompatActivity implements KeysAdapter.Actions {
     private static final String KEYS_FILTER_ALL = "all";
     private static final String KEYS_FILTER_AVAILABLE = "available";
     private static final String KEYS_FILTER_BORROWED = "borrowed";
@@ -70,6 +71,7 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
     private String keysFilter = KEYS_FILTER_ALL;
 
     @Override public void onCreate(Bundle state) {
+        ThemeMode.apply(this);
         super.onCreate(state);
         preferences = getSharedPreferences(AccessActivity.PREFS_NAME, MODE_PRIVATE);
         setContentView(R.layout.activity_keys);
@@ -468,10 +470,12 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
         PopupMenu menu = new PopupMenu(this, anchor);
         menu.getMenu().add("Agregar llave");
         menu.getMenu().add("Mostrar llaves ocultas");
+        menu.getMenu().add(ThemeMode.menuLabel(this));
         menu.setOnMenuItemClickListener(item -> {
             String option = item.getTitle().toString();
             if (option.startsWith("Agregar")) showAddDialog();
-            else showHiddenKeys();
+            else if (option.startsWith("Mostrar")) showHiddenKeys();
+            else ThemeMode.showChooser(this);
             return true;
         });
         menu.show();

@@ -87,6 +87,6 @@ Nunca modificar el `package_name` dentro de `google-services.json` para simular 
 
 - `versionCode` aumenta en cada APK distribuida.
 - `versionName` usa `mayor.menor.parche`.
-- La versión actual documentada es `3.9.20` (`versionCode 50`).
+- La versión actual documentada es `3.9.21` (`versionCode 51`).
 - Los APK entregados usan el nombre `RegistroAcceso-vX.Y.Z.apk`.
 - Las compilaciones de entrega se firman con la clave estable del proyecto desde GitHub Actions.

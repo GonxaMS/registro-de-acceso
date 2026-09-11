@@ -1,6 +1,5 @@
 package com.ejemplo.registroguardias;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.content.Intent;
@@ -9,6 +8,8 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentSnapshot;
@@ -27,7 +28,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-public final class AdminDashboardActivity extends Activity {
+public final class AdminDashboardActivity extends AppCompatActivity {
     private static final String ADMIN_USER = "Admin";
     private static final Locale LOCALE = new Locale("es", "AR");
 
@@ -47,6 +48,7 @@ public final class AdminDashboardActivity extends Activity {
     private String selectedMonth;
 
     @Override public void onCreate(Bundle state) {
+        ThemeMode.apply(this);
         super.onCreate(state);
         setContentView(R.layout.activity_admin_dashboard);
         applyWindowInsets();

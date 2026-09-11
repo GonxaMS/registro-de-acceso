@@ -1,6 +1,5 @@
 package com.ejemplo.registroguardias;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.os.Bundle;
@@ -9,6 +8,8 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
@@ -23,7 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public final class AdminDevicesActivity extends Activity {
+public final class AdminDevicesActivity extends AppCompatActivity {
     private final List<Device> devices = new ArrayList<>();
     private final Map<String, Boolean> permissions = new HashMap<>();
     private FirebaseFirestore database;
@@ -34,6 +35,7 @@ public final class AdminDevicesActivity extends Activity {
     private String ownUid = "";
 
     @Override public void onCreate(Bundle state) {
+        ThemeMode.apply(this);
         super.onCreate(state);
         setContentView(R.layout.activity_admin_devices);
         applyWindowInsets();

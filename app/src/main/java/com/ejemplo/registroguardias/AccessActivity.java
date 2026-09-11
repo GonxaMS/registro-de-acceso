@@ -1,6 +1,5 @@
 package com.ejemplo.registroguardias;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.TimePickerDialog;
 import android.content.Intent;
@@ -17,6 +16,8 @@ import android.widget.ListView;
 import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentReference;
@@ -39,7 +40,7 @@ import java.util.Map;
 import java.util.HashSet;
 import java.util.Set;
 
-public final class AccessActivity extends Activity implements PeopleAdapter.Actions {
+public final class AccessActivity extends AppCompatActivity implements PeopleAdapter.Actions {
     private static final String PEOPLE_FILTER_ALL = "all";
     private static final String PEOPLE_FILTER_INSIDE = "inside";
     private static final String PEOPLE_FILTER_OUTSIDE = "outside";
@@ -72,6 +73,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
     private String peopleFilter = PEOPLE_FILTER_ALL;
 
     @Override public void onCreate(Bundle state) {
+        ThemeMode.apply(this);
         super.onCreate(state);
         preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         if (currentUser().isEmpty()) {
@@ -389,6 +391,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
         menu.getMenu().add("Mostrar operarios ocultos");
         if (admin) menu.getMenu().add("Administración");
         menu.getMenu().add("Cambiar usuario");
+        menu.getMenu().add(ThemeMode.menuLabel(this));
         menu.getMenu().add("Versión " + BuildConfig.VERSION_NAME).setEnabled(false);
         menu.setOnMenuItemClickListener(item -> {
             String option = item.getTitle().toString();
@@ -397,6 +400,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
             else if (option.startsWith("Administración")) {
                 startActivity(new Intent(this, AdminDashboardActivity.class));
             }
+            else if (option.startsWith("Apariencia")) ThemeMode.showChooser(this);
             else showChangeUserDialog();
             return true;
         });

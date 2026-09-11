@@ -1,6 +1,5 @@
 package com.ejemplo.registroguardias;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
@@ -10,6 +9,8 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentReference;
@@ -32,7 +33,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-public final class AdminKeysActivity extends Activity {
+public final class AdminKeysActivity extends AppCompatActivity {
     private static final String ADMIN_USER = "Admin";
     private static final Locale LOCALE = new Locale("es", "AR");
 
@@ -57,6 +58,7 @@ public final class AdminKeysActivity extends Activity {
     private Button editButton;
 
     @Override public void onCreate(Bundle state) {
+        ThemeMode.apply(this);
         super.onCreate(state);
         setContentView(R.layout.activity_admin_keys);
         applyWindowInsets();
