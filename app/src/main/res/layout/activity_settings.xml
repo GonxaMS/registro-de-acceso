@@ -79,6 +79,26 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="22dp"
+            android:text="CUENTA"
+            android:textColor="@color/muted"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+        <Button
+            android:id="@+id/btnSettingsUser"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/input"
+            android:gravity="start|center_vertical"
+            android:text="Cambiar usuario"
+            android:textAllCaps="false"
+            android:textColor="@color/text"
+            android:textSize="16sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
             android:text="INTERACCIÓN"
             android:textColor="@color/muted"
             android:textSize="13sp"
@@ -124,6 +144,19 @@
             android:textAllCaps="false"
             android:textColor="@color/text"
             android:textSize="16sp" />
+
+        <Button
+            android:id="@+id/btnSettingsAdmin"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="22dp"
+            android:background="@drawable/input"
+            android:gravity="start|center_vertical"
+            android:text="Administración"
+            android:textAllCaps="false"
+            android:textColor="@color/text"
+            android:textSize="16sp"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/settingsAdminInfo"

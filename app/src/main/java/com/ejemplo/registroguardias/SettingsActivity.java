@@ -8,6 +8,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -27,6 +28,7 @@ public final class SettingsActivity extends AppCompatActivity {
     private TextView reminderTime;
     private TextView startScreen;
     private TextView appearance;
+    private View adminButton;
 
     @Override public void onCreate(Bundle state) {
         ThemeMode.apply(this);
@@ -39,6 +41,7 @@ public final class SettingsActivity extends AppCompatActivity {
         appearance.setOnClickListener(view -> ThemeMode.showChooser(this));
         startScreen = findViewById(R.id.btnSettingsStartScreen);
         startScreen.setOnClickListener(view -> chooseStartScreen());
+        findViewById(R.id.btnSettingsUser).setOnClickListener(view -> chooseUserName());
         remindersSwitch = findViewById(R.id.switchSettingsReminders);
         remindersSwitch.setChecked(AppPreferences.remindersEnabled(this));
         remindersSwitch.setOnCheckedChangeListener((button, checked) -> setRemindersEnabled(checked));
@@ -49,6 +52,9 @@ public final class SettingsActivity extends AppCompatActivity {
                 .putBoolean(AppPreferences.VIBRATION_ENABLED_KEY, checked).apply());
         reminderTime = findViewById(R.id.btnSettingsReminderTime);
         reminderTime.setOnClickListener(view -> chooseReminderTime());
+        adminButton = findViewById(R.id.btnSettingsAdmin);
+        adminButton.setOnClickListener(view ->
+            startActivity(new Intent(this, AdminDashboardActivity.class)));
         findViewById(R.id.btnSettingsReset).setOnClickListener(view -> confirmReset());
         render();
         loadAdminInfo();
@@ -121,6 +127,41 @@ public final class SettingsActivity extends AppCompatActivity {
             .show();
     }
 
+    private void chooseUserName() {
+        EditText input = new EditText(this);
+        input.setHint("Nombre del usuario");
+        input.setSingleLine(true);
+        input.setSelectAllOnFocus(true);
+        input.setText(AppPreferences.get(this).getString(AccessActivity.USER_NAME_KEY, ""));
+        int horizontalPadding = (int) (20 * getResources().getDisplayMetrics().density + 0.5f);
+        input.setPadding(horizontalPadding, input.getPaddingTop(),
+            horizontalPadding, input.getPaddingBottom());
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle("Cambiar usuario")
+            .setMessage("Los próximos movimientos quedarán registrados con este nombre.")
+            .setView(input)
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Guardar", null)
+            .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            .setOnClickListener(view -> {
+                String name = cleanName(input.getText().toString());
+                if (name.length() < 2) {
+                    input.setError("Escribe el nombre del usuario");
+                    return;
+                }
+                AppPreferences.get(this).edit()
+                    .putString(AccessActivity.USER_NAME_KEY, name).apply();
+                dialog.dismiss();
+                Toast.makeText(this, "Usuario cambiado a " + name, Toast.LENGTH_SHORT).show();
+            }));
+        dialog.show();
+    }
+
+    private static String cleanName(String value) {
+        return value.trim().replaceAll("\\s+", " ");
+    }
+
     private void confirmReset() {
         new AlertDialog.Builder(this)
             .setTitle("Restaurar preferencias")
@@ -148,6 +189,7 @@ public final class SettingsActivity extends AppCompatActivity {
         TextView info = findViewById(R.id.settingsAdminInfo);
         AdminAccess.checkRole(FirebaseFirestore.getInstance(), (allowed, role) -> {
             if (isFinishing() || !AdminAccess.ADMIN.equals(role)) return;
+            adminButton.setVisibility(View.VISIBLE);
             info.setVisibility(View.VISIBLE);
             info.setText("Información técnica\nVersión " + BuildConfig.VERSION_NAME
                 + " · código " + BuildConfig.VERSION_CODE

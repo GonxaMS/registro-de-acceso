@@ -69,7 +69,6 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
     private TextView offlineBanner;
     private PeopleAdapter adapter;
     private NetworkMonitor networkMonitor;
-    private boolean admin;
     private boolean networkAvailable = true;
     private String peopleFilter = PEOPLE_FILTER_ALL;
 
@@ -172,7 +171,6 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
             }
             return null;
         }).addOnCompleteListener(task -> AdminAccess.checkRole(database, (allowed, role) -> {
-            admin = allowed;
             if (AdminAccess.BLOCKED.equals(role)) {
                 startActivity(new Intent(this, BlockedActivity.class));
                 finish();
@@ -401,23 +399,14 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
         PopupMenu menu = new PopupMenu(this, anchor);
         menu.getMenu().add("Agregar operario");
         menu.getMenu().add("Mostrar operarios ocultos");
-        if (admin) menu.getMenu().add("Administración");
-        menu.getMenu().add("Cambiar usuario");
         menu.getMenu().add("Ajustes");
-        menu.getMenu().add(ThemeMode.menuLabel(this));
-        menu.getMenu().add("Versión " + BuildConfig.VERSION_NAME).setEnabled(false);
         menu.setOnMenuItemClickListener(item -> {
             String option = item.getTitle().toString();
             if (option.startsWith("Agregar")) showAddDialog();
             else if (option.startsWith("Mostrar")) showHiddenPeople();
-            else if (option.startsWith("Administración")) {
-                startActivity(new Intent(this, AdminDashboardActivity.class));
-            }
             else if (option.startsWith("Ajustes")) {
                 startActivity(new Intent(this, SettingsActivity.class));
             }
-            else if (option.startsWith("Apariencia")) ThemeMode.showChooser(this);
-            else showChangeUserDialog();
             return true;
         });
         menu.show();
@@ -893,7 +882,6 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
                 finish();
                 return;
             }
-            admin = allowed;
         });
     }
 
