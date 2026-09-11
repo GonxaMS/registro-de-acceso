@@ -331,15 +331,15 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
             .setOnClickListener(view -> {
                 String writtenName = keyPersonName(input.getText().toString());
                 if (writtenName.length() < 2) {
-                    input.setError(R.string.key_name_error);
+                    input.setError(getString(R.string.key_name_error));
                     return;
                 }
                 if (!writtenName.contains(" ")) {
-                    input.setError(R.string.key_name_order_error);
+                    input.setError(getString(R.string.key_name_order_error));
                     return;
                 }
                 if (writtenName.length() > 120) {
-                    input.setError(R.string.key_name_too_long);
+                    input.setError(getString(R.string.key_name_too_long));
                     return;
                 }
                 SelectablePerson chosen = null;
@@ -502,12 +502,12 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
             .setOnClickListener(view -> {
                 String name = cleanName(input.getText().toString());
                 if (name.isEmpty()) {
-                    input.setError(R.string.key_name_required);
+                    input.setError(getString(R.string.key_name_required));
                     return;
                 }
                 for (KeyItem key : visibleKeys) {
                     if (key.name.equalsIgnoreCase(name)) {
-                        input.setError(R.string.key_already_exists);
+                        input.setError(getString(R.string.key_already_exists));
                         return;
                     }
                 }

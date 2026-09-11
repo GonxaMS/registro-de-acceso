@@ -151,7 +151,7 @@ public final class SettingsActivity extends AppCompatActivity {
             .setOnClickListener(view -> {
                 String name = cleanName(input.getText().toString());
                 if (name.length() < 2) {
-                    input.setError(R.string.setup_user_error);
+                    input.setError(getString(R.string.setup_user_error));
                     return;
                 }
                 AppPreferences.get(this).edit()

@@ -431,12 +431,12 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
             .setOnClickListener(view -> {
                 String name = cleanName(input.getText().toString());
                 if (name.isEmpty()) {
-                    input.setError(R.string.enter_person_name);
+                    input.setError(getString(R.string.enter_person_name));
                     return;
                 }
                 for (Person person : visiblePeople) {
                     if (person.name.equalsIgnoreCase(name)) {
-                        input.setError(R.string.person_already_exists);
+                        input.setError(getString(R.string.person_already_exists));
                         return;
                     }
                 }
@@ -566,7 +566,7 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
             .setOnClickListener(view -> {
                 String name = cleanName(input.getText().toString());
                 if (name.length() < 2) {
-                    input.setError(R.string.enter_user_name);
+                    input.setError(getString(R.string.enter_user_name));
                     return;
                 }
                 preferences.edit().putString(USER_NAME_KEY, name).apply();

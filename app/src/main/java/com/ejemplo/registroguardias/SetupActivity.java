@@ -41,7 +41,7 @@ public final class SetupActivity extends AppCompatActivity {
     private void saveAndContinue() {
         String name = cleanName(input.getText().toString());
         if (name.length() < 2) {
-            input.setError(R.string.setup_user_error);
+            input.setError(getString(R.string.setup_user_error));
             return;
         }
         preferences.edit().putString(AccessActivity.USER_NAME_KEY, name).apply();
