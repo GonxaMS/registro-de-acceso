@@ -9,6 +9,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -319,6 +320,8 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
             return movementId;
         }).addOnSuccessListener(movementId -> {
             finishMovement(person.id);
+            adapter.highlightPerson(person.id);
+            successHaptic();
             toast(type + " registrado a las " + time + " por " + registeredBy);
         }).addOnFailureListener(error -> {
             finishMovement(person.id);
@@ -337,6 +340,10 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
     private void finishMovement(String personId) {
         pendingMovements.remove(personId);
         adapter.notifyDataSetChanged();
+    }
+
+    private void successHaptic() {
+        getWindow().getDecorView().performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
     }
 
     private static Map<String, Object> baseMovement(String id, Person person, String type,
@@ -853,6 +860,21 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
 
     private void toast(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        if (database == null || authentication == null
+            || authentication.getCurrentUser() == null || !networkAvailable) return;
+        AdminAccess.checkRole(database, (allowed, role) -> {
+            if (isFinishing()) return;
+            if (AdminAccess.BLOCKED.equals(role)) {
+                startActivity(new Intent(this, BlockedActivity.class));
+                finish();
+                return;
+            }
+            admin = allowed;
+        });
     }
 
     @Override protected void onDestroy() {

@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -501,6 +502,18 @@ public final class AdminKeysActivity extends Activity {
                 .create();
             dialog.setOnDismissListener(ignored -> loadErrorDialogVisible = false);
             dialog.show();
+        });
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        if (database == null || !NetworkMonitor.isAvailable(this)) return;
+        AdminAccess.checkRole(database, (allowed, role) -> {
+            if (isFinishing() || AdminAccess.ADMIN.equals(role)) return;
+            if (AdminAccess.BLOCKED.equals(role)) {
+                startActivity(new Intent(this, BlockedActivity.class));
+            }
+            finish();
         });
     }
 

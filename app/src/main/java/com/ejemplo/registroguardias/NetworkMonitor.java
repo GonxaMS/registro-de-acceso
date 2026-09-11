@@ -49,10 +49,26 @@ final class NetworkMonitor {
         listener.onNetworkChanged(isAvailable());
     }
 
-    private boolean isAvailable() {
-        Network network = connectivityManager.getActiveNetwork();
+    static boolean isAvailable(Context context) {
+        ConnectivityManager manager = (ConnectivityManager)
+            context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (manager == null) return false;
+        Network network = manager.getActiveNetwork();
         NetworkCapabilities capabilities = network == null
-            ? null : connectivityManager.getNetworkCapabilities(network);
+            ? null : manager.getNetworkCapabilities(network);
+        return capabilities != null
+            && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+    }
+
+    private boolean isAvailable() {
+        return isAvailable(connectivityManager);
+    }
+
+    private static boolean isAvailable(ConnectivityManager manager) {
+        if (manager == null) return false;
+        Network network = manager.getActiveNetwork();
+        NetworkCapabilities capabilities = network == null
+            ? null : manager.getNetworkCapabilities(network);
         return capabilities != null
             && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
     }

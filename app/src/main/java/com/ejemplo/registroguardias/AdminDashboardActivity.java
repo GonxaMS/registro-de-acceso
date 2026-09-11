@@ -285,6 +285,18 @@ public final class AdminDashboardActivity extends Activity {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
+    @Override protected void onResume() {
+        super.onResume();
+        if (database == null || !NetworkMonitor.isAvailable(this)) return;
+        AdminAccess.checkRole(database, (allowed, role) -> {
+            if (isFinishing() || AdminAccess.ADMIN.equals(role)) return;
+            if (AdminAccess.BLOCKED.equals(role)) {
+                startActivity(new Intent(this, BlockedActivity.class));
+            }
+            finish();
+        });
+    }
+
     @Override protected void onDestroy() {
         if (syncStatusListener != null) syncStatusListener.remove();
         if (syncErrorsListener != null) syncErrorsListener.remove();

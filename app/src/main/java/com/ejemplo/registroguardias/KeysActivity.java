@@ -8,6 +8,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -426,6 +427,8 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
             return movementId;
         }).addOnSuccessListener(movementId -> {
             finishKeyMovement(key.id);
+            adapter.highlightKey(key.id);
+            successHaptic();
             toast((take ? person.name + " retiró " : person.name + " devolvió ") + key.name
                 + " a las " + time);
         }).addOnFailureListener(error -> {
@@ -441,6 +444,10 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
     private void finishKeyMovement(String keyId) {
         pendingMovements.remove(keyId);
         adapter.notifyDataSetChanged();
+    }
+
+    private void successHaptic() {
+        getWindow().getDecorView().performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
     }
 
     @Override public void onKeyOptions(View anchor, KeyItem key) {
@@ -675,6 +682,18 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
 
     private void toast(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        if (database == null || !networkAvailable) return;
+        AdminAccess.checkRole(database, (admin, role) -> {
+            if (isFinishing()) return;
+            if (AdminAccess.BLOCKED.equals(role)) {
+                startActivity(new Intent(this, BlockedActivity.class));
+                finish();
+            }
+        });
     }
 
     @Override protected void onDestroy() {

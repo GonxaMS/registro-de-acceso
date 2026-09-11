@@ -1,6 +1,8 @@
 package com.ejemplo.registroguardias;
 
-import android.graphics.Color;
+import android.content.res.ColorStateList;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -21,11 +23,24 @@ final class KeysAdapter extends BaseAdapter {
     private final KeysActivity activity;
     private final List<KeyItem> keys;
     private final Actions actions;
+    private final Handler highlightHandler = new Handler(Looper.getMainLooper());
+    private String highlightedId = "";
 
     KeysAdapter(KeysActivity activity, List<KeyItem> keys, Actions actions) {
         this.activity = activity;
         this.keys = keys;
         this.actions = actions;
+    }
+
+    void highlightKey(String id) {
+        highlightedId = id;
+        notifyDataSetChanged();
+        highlightHandler.postDelayed(() -> {
+            if (id.equals(highlightedId)) {
+                highlightedId = "";
+                notifyDataSetChanged();
+            }
+        }, 1800L);
     }
 
     @Override public int getCount() { return keys.size(); }
@@ -43,12 +58,15 @@ final class KeysAdapter extends BaseAdapter {
         }
 
         KeyItem key = getItem(position);
+        recycled.setBackgroundTintList(key.id.equals(highlightedId)
+            ? ColorStateList.valueOf(activity.getColor(R.color.highlight_key)) : null);
         boolean borrowed = "Prestada".equals(key.state);
         boolean pending = actions.isKeyMovementPending(key);
         boolean networkAvailable = actions.isNetworkAvailable();
         holder.name.setText(key.name);
         holder.status.setText(borrowed ? "● Prestada" : "✓ Disponible");
-        holder.status.setTextColor(Color.parseColor(borrowed ? "#B25A00" : "#1B7F4B"));
+        holder.status.setTextColor(activity.getColor(
+            borrowed ? R.color.gold_dark : R.color.green_dark));
         holder.detail.setText(borrowed
             ? "La tiene " + key.holder + " desde " + key.date + " " + key.time
             : "Lista para retirar");
@@ -66,7 +84,8 @@ final class KeysAdapter extends BaseAdapter {
     private static void setEnabled(Button button, boolean enabled) {
         button.setEnabled(enabled);
         button.setAlpha(1f);
-        button.setTextColor(Color.parseColor(enabled ? "#FFFFFF" : "#8B98AA"));
+        button.setTextColor(button.getContext().getColor(
+            enabled ? R.color.white : R.color.disabled_text));
     }
 
     private static final class Holder {

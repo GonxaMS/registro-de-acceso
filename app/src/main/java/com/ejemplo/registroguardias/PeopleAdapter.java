@@ -1,6 +1,8 @@
 package com.ejemplo.registroguardias;
 
-import android.graphics.Color;
+import android.content.res.ColorStateList;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -21,7 +23,9 @@ final class PeopleAdapter extends BaseAdapter {
     private final AccessActivity activity;
     private final List<Person> people;
     private final Actions actions;
+    private final Handler highlightHandler = new Handler(Looper.getMainLooper());
     private String today = "";
+    private String highlightedId = "";
 
     PeopleAdapter(AccessActivity activity, List<Person> people, Actions actions) {
         this.activity = activity;
@@ -31,6 +35,17 @@ final class PeopleAdapter extends BaseAdapter {
 
     void setToday(String value) {
         today = value;
+    }
+
+    void highlightPerson(String id) {
+        highlightedId = id;
+        notifyDataSetChanged();
+        highlightHandler.postDelayed(() -> {
+            if (id.equals(highlightedId)) {
+                highlightedId = "";
+                notifyDataSetChanged();
+            }
+        }, 1800L);
     }
 
     @Override public int getCount() { return people.size(); }
@@ -48,6 +63,8 @@ final class PeopleAdapter extends BaseAdapter {
         }
 
         Person person = getItem(position);
+        recycled.setBackgroundTintList(person.id.equals(highlightedId)
+            ? ColorStateList.valueOf(activity.getColor(R.color.highlight_person)) : null);
         boolean inside = "Dentro".equals(person.state);
         boolean completed = !inside && today.equals(person.date) && "Salida".equals(person.lastMovement);
         boolean pending = actions.isMovementPending(person);
@@ -55,7 +72,8 @@ final class PeopleAdapter extends BaseAdapter {
 
         holder.name.setText(person.name);
         holder.status.setText(inside ? "● Dentro" : completed ? "✓ Completado" : "● Fuera");
-        holder.status.setTextColor(Color.parseColor(inside ? "#1B7F4B" : completed ? "#1769AA" : "#5E6C84"));
+        holder.status.setTextColor(activity.getColor(
+            inside ? R.color.green_dark : completed ? R.color.blue_dark : R.color.muted));
 
         setEnabled(holder.entry, networkAvailable && !pending && !inside && !completed);
         setEnabled(holder.exit, networkAvailable && !pending && inside);
@@ -70,7 +88,8 @@ final class PeopleAdapter extends BaseAdapter {
     private static void setEnabled(Button button, boolean enabled) {
         button.setEnabled(enabled);
         button.setAlpha(1f);
-        button.setTextColor(Color.parseColor(enabled ? "#FFFFFF" : "#8B98AA"));
+        button.setTextColor(button.getContext().getColor(
+            enabled ? R.color.white : R.color.disabled_text));
     }
 
     private static final class Holder {

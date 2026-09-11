@@ -8,6 +8,7 @@
     <color name="gold">#F5B019</color>
     <color name="gold_dark">#D49310</color>
     <color name="surface">#F5F7FB</color>
+    <color name="panel">#FFFFFF</color>
     <color name="white">#FFFFFF</color>
     <color name="text">#10233F</color>
     <color name="muted">#61728A</color>
@@ -22,4 +23,9 @@
     <color name="filter_unselected_text">#21436F</color>
     <color name="offline_banner">#B3261E</color>
     <color name="offline_banner_text">#FFFFFF</color>
+    <color name="highlight_person">#E3F4EA</color>
+    <color name="highlight_key">#FFF1CF</color>
+    <color name="gear_background">#EEF4FF</color>
+    <color name="gear_background_pressed">#DCE9FF</color>
+    <color name="icon">#2459C4</color>
 </resources>

@@ -1,6 +1,6 @@
 # Matriz de permisos verificada
 
-Estado correspondiente a la versión 3.9.19. La interfaz y las reglas de Firestore deben mantener
+Estado correspondiente a la versión 3.9.20. La interfaz y las reglas de Firestore deben mantener
 esta misma matriz.
 
 | Función | Administrativo | Normal | Bloqueado |
@@ -44,8 +44,10 @@ personal o llaves y las reglas de Firebase rechazan la lectura y escritura de da
 
 - `AdminAccess.checkRole` decide la pantalla inicial según `administradores` y `dispositivos`.
 - `AccessActivity` inicia las consultas únicamente después de aceptar Administrativo o Normal.
-- `KeysActivity` vuelve a comprobar el rol antes de consultar datos.
+- `AccessActivity` y `KeysActivity` vuelven a comprobar el rol al regresar a primer plano.
 - Todas las pantallas históricas llaman `AdminAccess.check` y se cierran si el UID no es Admin.
+- Las pantallas administrativas vuelven a comprobar que el dispositivo siga siendo Administrativo
+  al regresar a primer plano.
 - `hasAccess()` en Firestore incluye Administrativo y Normal.
 - Las ramas con `isAdmin()` protegen correcciones históricas, dispositivos, errores y comandos.
 - Una corrección diaria debe coincidir con la fecha operativa actual guardada en `personal`.

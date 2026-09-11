@@ -1,6 +1,6 @@
 # Referencia completa y estado del proyecto
 
-Documento actualizado para la versión 3.9.19. Describe el comportamiento vigente, las decisiones
+Documento actualizado para la versión 3.9.20. Describe el comportamiento vigente, las decisiones
 aceptadas y los riesgos pendientes. Firebase es la fuente de verdad; Google Sheets es una copia
 operativa secundaria.
 
@@ -90,17 +90,18 @@ Archivos privados no versionados:
 - `local.properties`, con `sdk.dir` y `sheets.web_url`.
 - Propiedades privadas de Apps Script para Firebase e `ID_PLANILLA`.
 
-GitHub Actions requiere `GOOGLE_SERVICES_JSON` y `SHEETS_WEB_URL`.
+GitHub Actions requiere `GOOGLE_SERVICES_JSON`, `SHEETS_WEB_URL` y los secretos de firma del APK.
 
 ## Compilación y entrega
 
 La versión se controla en `app/build.gradle.kts`. Cada APK aumenta `versionCode` y usa un
-`versionName` visible. El archivo entregado se llama `RegistroAcceso-vX.Y.Z.apk`.
+`versionName` visible. El archivo entregado se llama `RegistroAcceso-vX.Y.Z.apk` y se firma con la
+clave estable del proyecto desde GitHub Actions.
 
 Comprobaciones actuales:
 
 ```powershell
-.\gradlew.bat --no-daemon testDebugUnitTest lintDebug assembleDebug
+.\gradlew.bat --no-daemon testDebugUnitTest lintDebug assembleRelease
 firebase deploy --only firestore:rules --dry-run --project registro-guardias-408cb
 ```
 
@@ -111,17 +112,13 @@ datos ficticios.
 ## Problemas pendientes clasificados
 
 ### Alta
-
-- Las APK actuales usan firma de desarrollo. Antes de una distribución definitiva debe configurarse
-  una firma de producción estable; cambiar de firma después impide actualizar encima de instalaciones
-  anteriores.
 - El nombre del usuario es texto local editable. Puede utilizarse el nombre de otra persona y el UID
   del dispositivo no se guarda actualmente en cada movimiento.
 
 ### Media
 
-- Los cambios de rol no cierran inmediatamente una app que ya estaba abierta. Firebase rechaza las
-  operaciones, pero los datos previamente cargados pueden seguir visibles hasta reiniciar.
+- Los cambios de rol se vuelven a comprobar al regresar a cada pantalla operativa o administrativa;
+  si el permiso fue retirado, la pantalla se cierra o muestra el bloqueo correspondiente.
 - `fecha` y `hora` proceden del reloj del teléfono. `creado` usa la hora oficial del servidor como
   respaldo, pero no valida ni reemplaza los valores operativos.
 - No hay pruebas automáticas con casos reales; la validación funcional sigue siendo manual.
@@ -149,7 +146,7 @@ datos ficticios.
 3. Prestar y devolver una llave con Personal y con un nombre exclusivo.
 4. Agregar, ocultar y restaurar un operario y una llave.
 5. Realizar una corrección histórica desde Admin.
-6. Cambiar el rol de otro dispositivo y reiniciar la app para verificarlo.
+6. Cambiar el rol de otro dispositivo, volver a la app y verificar la actualización del acceso.
 7. Confirmar Firebase → Sheets y ausencia de duplicados.
 8. Simular un fallo de carga, pulsar Reintentar y comprobar su aparición en Admin si persiste.
 

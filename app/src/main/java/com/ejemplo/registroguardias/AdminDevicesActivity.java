@@ -2,6 +2,7 @@ package com.ejemplo.registroguardias;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -233,6 +234,18 @@ public final class AdminDevicesActivity extends Activity {
     }
 
     private static String value(String value) { return value == null ? "" : value; }
+
+    @Override protected void onResume() {
+        super.onResume();
+        if (database == null || !NetworkMonitor.isAvailable(this)) return;
+        AdminAccess.checkRole(database, (allowed, role) -> {
+            if (isFinishing() || AdminAccess.ADMIN.equals(role)) return;
+            if (AdminAccess.BLOCKED.equals(role)) {
+                startActivity(new Intent(this, BlockedActivity.class));
+            }
+            finish();
+        });
+    }
 
     @Override protected void onDestroy() {
         if (devicesListener != null) devicesListener.remove();
