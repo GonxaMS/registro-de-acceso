@@ -28,8 +28,8 @@ android {
         applicationId = "com.ejemplo.registroguardias"
         minSdk = 24
         targetSdk = 35
-        versionCode = 47
-        versionName = "3.9.17"
+        versionCode = 48
+        versionName = "3.9.18"
         buildConfigField("String", "SHEETS_WEB_URL", "\"${sheetsWebUrl.replace("\"", "\\\"")}\"")
         buildConfigField("boolean", "USE_FIREBASE_EMULATOR", useFirebaseEmulator.toString())
     }

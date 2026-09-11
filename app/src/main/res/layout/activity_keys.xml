@@ -114,6 +114,31 @@
             android:textColorHint="@color/muted"
             android:textSize="18sp" />
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/filterKeysAll"
+                style="@style/FilterChip"
+                android:text="Todas" />
+
+            <TextView
+                android:id="@+id/filterKeysAvailable"
+                style="@style/FilterChip"
+                android:layout_marginStart="8dp"
+                android:text="Disponibles" />
+
+            <TextView
+                android:id="@+id/filterKeysBorrowed"
+                style="@style/FilterChip"
+                android:layout_marginStart="8dp"
+                android:text="Prestadas" />
+        </LinearLayout>
+
         <TextView
             android:id="@+id/txtKeyCount"
             android:layout_width="wrap_content"

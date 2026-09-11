@@ -38,6 +38,9 @@ import java.util.HashSet;
 import java.util.Set;
 
 public final class KeysActivity extends Activity implements KeysAdapter.Actions {
+    private static final String KEYS_FILTER_ALL = "all";
+    private static final String KEYS_FILTER_AVAILABLE = "available";
+    private static final String KEYS_FILTER_BORROWED = "borrowed";
     private final List<KeyItem> visibleKeys = new ArrayList<>();
     private final List<KeyItem> hiddenKeys = new ArrayList<>();
     private final List<KeyItem> filteredKeys = new ArrayList<>();
@@ -56,7 +59,11 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
     private SharedPreferences preferences;
     private EditText search;
     private TextView count;
+    private TextView keysFilterAll;
+    private TextView keysFilterAvailable;
+    private TextView keysFilterBorrowed;
     private KeysAdapter adapter;
+    private String keysFilter = KEYS_FILTER_ALL;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -66,6 +73,9 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
 
         search = findViewById(R.id.inputKeySearch);
         count = findViewById(R.id.txtKeyCount);
+        keysFilterAll = findViewById(R.id.filterKeysAll);
+        keysFilterAvailable = findViewById(R.id.filterKeysAvailable);
+        keysFilterBorrowed = findViewById(R.id.filterKeysBorrowed);
         adapter = new KeysAdapter(this, filteredKeys, this);
         ((ListView) findViewById(R.id.listKeys)).setAdapter(adapter);
         ((TextView) findViewById(R.id.txtKeysToday)).setText(
@@ -74,6 +84,10 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
         findViewById(R.id.btnBack).setOnClickListener(view -> finish());
         findViewById(R.id.btnKeyMenu).setOnClickListener(this::showMainMenu);
         findViewById(R.id.btnKeySheets).setOnClickListener(view -> openSheets());
+        keysFilterAll.setOnClickListener(view -> setKeysFilter(KEYS_FILTER_ALL));
+        keysFilterAvailable.setOnClickListener(view -> setKeysFilter(KEYS_FILTER_AVAILABLE));
+        keysFilterBorrowed.setOnClickListener(view -> setKeysFilter(KEYS_FILTER_BORROWED));
+        updateKeysFilterButtons();
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence text, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence text, int start, int before, int count) {
@@ -206,7 +220,10 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
         filteredKeys.clear();
         String normalized = query.trim().toLowerCase(Locale.getDefault());
         for (KeyItem key : visibleKeys) {
-            if (key.name.toLowerCase(Locale.getDefault()).contains(normalized)) {
+            boolean matchesState = KEYS_FILTER_ALL.equals(keysFilter)
+                || (KEYS_FILTER_AVAILABLE.equals(keysFilter) && "Disponible".equals(key.state))
+                || (KEYS_FILTER_BORROWED.equals(keysFilter) && "Prestada".equals(key.state));
+            if (matchesState && key.name.toLowerCase(Locale.getDefault()).contains(normalized)) {
                 filteredKeys.add(key);
             }
         }
@@ -216,6 +233,18 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
             + (filteredKeys.size() == 1 ? " llave" : " llaves")
             + " · " + borrowed + " prestadas");
         adapter.notifyDataSetChanged();
+    }
+
+    private void setKeysFilter(String filter) {
+        keysFilter = filter;
+        updateKeysFilterButtons();
+        filterKeys(search.getText().toString());
+    }
+
+    private void updateKeysFilterButtons() {
+        keysFilterAll.setSelected(KEYS_FILTER_ALL.equals(keysFilter));
+        keysFilterAvailable.setSelected(KEYS_FILTER_AVAILABLE.equals(keysFilter));
+        keysFilterBorrowed.setSelected(KEYS_FILTER_BORROWED.equals(keysFilter));
     }
 
     @Override public void onKeyMovement(KeyItem key, String type) {

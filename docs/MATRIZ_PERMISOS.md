@@ -1,6 +1,6 @@
 # Matriz de permisos verificada
 
-Estado correspondiente a la versión 3.9.15. La interfaz y las reglas de Firestore deben mantener
+Estado correspondiente a la versión 3.9.18. La interfaz y las reglas de Firestore deben mantener
 esta misma matriz.
 
 | Función | Administrativo | Normal | Bloqueado |

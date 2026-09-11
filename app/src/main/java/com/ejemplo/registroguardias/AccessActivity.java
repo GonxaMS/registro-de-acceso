@@ -39,6 +39,9 @@ import java.util.HashSet;
 import java.util.Set;
 
 public final class AccessActivity extends Activity implements PeopleAdapter.Actions {
+    private static final String PEOPLE_FILTER_ALL = "all";
+    private static final String PEOPLE_FILTER_INSIDE = "inside";
+    private static final String PEOPLE_FILTER_OUTSIDE = "outside";
     static final String PREFS_NAME = "registro_guardias";
     static final String USER_NAME_KEY = "operator_user_name";
     static final String SHEETS_WEB_URL = BuildConfig.SHEETS_WEB_URL;
@@ -57,8 +60,12 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
     private EditText search;
     private TextView count;
     private TextView borrowedKeys;
+    private TextView peopleFilterAll;
+    private TextView peopleFilterInside;
+    private TextView peopleFilterOutside;
     private PeopleAdapter adapter;
     private boolean admin;
+    private String peopleFilter = PEOPLE_FILTER_ALL;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -74,6 +81,9 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
         search = findViewById(R.id.inputSearch);
         count = findViewById(R.id.txtCount);
         borrowedKeys = findViewById(R.id.txtBorrowedKeys);
+        peopleFilterAll = findViewById(R.id.filterPeopleAll);
+        peopleFilterInside = findViewById(R.id.filterPeopleInside);
+        peopleFilterOutside = findViewById(R.id.filterPeopleOutside);
         adapter = new PeopleAdapter(this, filteredPeople, this);
         adapter.setToday(today());
         ((ListView) findViewById(R.id.listPeople)).setAdapter(adapter);
@@ -84,6 +94,10 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
         findViewById(R.id.btnSheetsShortcut).setOnClickListener(view -> openSheets());
         findViewById(R.id.btnKeysShortcut).setOnClickListener(view ->
             startActivity(new Intent(this, KeysActivity.class)));
+        peopleFilterAll.setOnClickListener(view -> setPeopleFilter(PEOPLE_FILTER_ALL));
+        peopleFilterInside.setOnClickListener(view -> setPeopleFilter(PEOPLE_FILTER_INSIDE));
+        peopleFilterOutside.setOnClickListener(view -> setPeopleFilter(PEOPLE_FILTER_OUTSIDE));
+        updatePeopleFilterButtons();
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence text, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence text, int start, int before, int count) {
@@ -199,7 +213,10 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
         filteredPeople.clear();
         String normalized = query.trim().toLowerCase(Locale.getDefault());
         for (Person person : visiblePeople) {
-            if (person.name.toLowerCase(Locale.getDefault()).contains(normalized)) {
+            boolean matchesState = PEOPLE_FILTER_ALL.equals(peopleFilter)
+                || (PEOPLE_FILTER_INSIDE.equals(peopleFilter) && "Dentro".equals(person.state))
+                || (PEOPLE_FILTER_OUTSIDE.equals(peopleFilter) && "Fuera".equals(person.state));
+            if (matchesState && person.name.toLowerCase(Locale.getDefault()).contains(normalized)) {
                 filteredPeople.add(person);
             }
         }
@@ -209,6 +226,18 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
             + (filteredPeople.size() == 1 ? " operario" : " operarios")
             + " · " + inside + " dentro");
         adapter.notifyDataSetChanged();
+    }
+
+    private void setPeopleFilter(String filter) {
+        peopleFilter = filter;
+        updatePeopleFilterButtons();
+        filterPeople(search.getText().toString());
+    }
+
+    private void updatePeopleFilterButtons() {
+        peopleFilterAll.setSelected(PEOPLE_FILTER_ALL.equals(peopleFilter));
+        peopleFilterInside.setSelected(PEOPLE_FILTER_INSIDE.equals(peopleFilter));
+        peopleFilterOutside.setSelected(PEOPLE_FILTER_OUTSIDE.equals(peopleFilter));
     }
 
     @Override public void onMovement(Person person, String type) {
