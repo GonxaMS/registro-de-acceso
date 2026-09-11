@@ -17,7 +17,7 @@
             android:layout_width="wrap_content"
             android:layout_height="48dp"
             android:background="@android:color/transparent"
-            android:text="← Volver"
+            android:text="@string/back"
             android:textAllCaps="false"
             android:textColor="@color/blue"
             android:textSize="16sp" />
@@ -25,7 +25,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Ajustes"
+            android:text="@string/settings_title"
             android:textColor="@color/text"
             android:textSize="28sp"
             android:textStyle="bold" />
@@ -33,7 +33,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Preferencias de uso de la aplicación"
+            android:text="@string/settings_subtitle"
             android:textColor="@color/muted"
             android:textSize="15sp" />
 
@@ -41,7 +41,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="APARIENCIA"
+            android:text="@string/settings_section_appearance"
             android:textColor="@color/muted"
             android:textSize="13sp"
             android:textStyle="bold" />
@@ -60,7 +60,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="22dp"
-            android:text="INICIO"
+            android:text="@string/settings_section_start"
             android:textColor="@color/muted"
             android:textSize="13sp"
             android:textStyle="bold" />
@@ -79,7 +79,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="22dp"
-            android:text="CUENTA"
+            android:text="@string/settings_section_account"
             android:textColor="@color/muted"
             android:textSize="13sp"
             android:textStyle="bold" />
@@ -90,7 +90,7 @@
             android:layout_marginTop="8dp"
             android:background="@drawable/input"
             android:gravity="start|center_vertical"
-            android:text="Cambiar usuario"
+            android:text="@string/settings_change_user"
             android:textAllCaps="false"
             android:textColor="@color/text"
             android:textSize="16sp" />
@@ -99,7 +99,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="22dp"
-            android:text="INTERACCIÓN"
+            android:text="@string/settings_section_interaction"
             android:textColor="@color/muted"
             android:textSize="13sp"
             android:textStyle="bold" />
@@ -108,7 +108,7 @@
             android:layout_width="match_parent"
             android:layout_height="54dp"
             android:layout_marginTop="4dp"
-            android:text="Vibrar al registrar un movimiento"
+            android:text="@string/settings_vibration"
             android:textColor="@color/text"
             android:textSize="16sp" />
 
@@ -116,7 +116,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="22dp"
-            android:text="RECORDATORIOS"
+            android:text="@string/settings_section_reminders"
             android:textColor="@color/muted"
             android:textSize="13sp"
             android:textStyle="bold" />
@@ -125,13 +125,13 @@
             android:layout_width="match_parent"
             android:layout_height="54dp"
             android:layout_marginTop="4dp"
-            android:text="Avisar si quedan personas dentro"
+            android:text="@string/settings_reminders_enabled"
             android:textColor="@color/text"
             android:textSize="16sp" />
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Solo se envía una notificación cuando hay personas sin salida registrada."
+            android:text="@string/settings_reminders_description"
             android:textColor="@color/muted"
             android:textSize="14sp" />
         <Button
@@ -152,7 +152,7 @@
             android:layout_marginTop="22dp"
             android:background="@drawable/input"
             android:gravity="start|center_vertical"
-            android:text="Administración"
+            android:text="@string/settings_admin"
             android:textAllCaps="false"
             android:textColor="@color/text"
             android:textSize="16sp"
@@ -173,7 +173,7 @@
             android:layout_height="54dp"
             android:layout_marginTop="24dp"
             android:background="@drawable/button_exit"
-            android:text="Restaurar preferencias"
+            android:text="@string/settings_reset"
             android:textAllCaps="false"
             android:textColor="@color/white"
             android:textSize="16sp" />

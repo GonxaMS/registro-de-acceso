@@ -459,7 +459,7 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
             return;
         }
         PopupMenu menu = new PopupMenu(this, anchor);
-        menu.getMenu().add("Ocultar llave");
+        menu.getMenu().add(R.string.menu_hide_key);
         menu.setOnMenuItemClickListener(item -> {
             confirmHide(key);
             return true;
@@ -469,14 +469,16 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
 
     private void showMainMenu(View anchor) {
         PopupMenu menu = new PopupMenu(this, anchor);
-        menu.getMenu().add("Agregar llave");
-        menu.getMenu().add("Mostrar llaves ocultas");
-        menu.getMenu().add("Ajustes");
+        menu.getMenu().add(R.string.menu_add_key);
+        menu.getMenu().add(R.string.menu_show_hidden_keys);
+        menu.getMenu().add(R.string.menu_settings);
         menu.setOnMenuItemClickListener(item -> {
             String option = item.getTitle().toString();
-            if (option.startsWith("Agregar")) showAddDialog();
-            else if (option.startsWith("Mostrar")) showHiddenKeys();
-            else if (option.startsWith("Ajustes")) startActivity(new Intent(this, SettingsActivity.class));
+            if (option.equals(getString(R.string.menu_add_key))) showAddDialog();
+            else if (option.equals(getString(R.string.menu_show_hidden_keys))) showHiddenKeys();
+            else if (option.equals(getString(R.string.menu_settings))) {
+                startActivity(new Intent(this, SettingsActivity.class));
+            }
             return true;
         });
         menu.show();

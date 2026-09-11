@@ -20,13 +20,17 @@ final class ThemeMode {
     }
 
     static String menuLabel(Context context) {
-        return "Apariencia: " + label(saved(context));
+        return context.getString(R.string.appearance_menu_label, label(context, saved(context)));
     }
 
     static void showChooser(Activity activity) {
-        String[] options = {"Automático (según el teléfono)", "Modo claro", "Modo oscuro"};
+        String[] options = {
+            activity.getString(R.string.appearance_automatic),
+            activity.getString(R.string.appearance_light),
+            activity.getString(R.string.appearance_dark)
+        };
         new android.app.AlertDialog.Builder(activity)
-            .setTitle("Apariencia")
+            .setTitle(R.string.appearance_title)
             .setSingleChoiceItems(options, saved(activity), (dialog, which) -> {
                 AppPreferences.get(activity).edit().putInt(KEY, which).apply();
                 dialog.dismiss();
@@ -48,10 +52,10 @@ final class ThemeMode {
         return AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
     }
 
-    private static String label(int mode) {
-        if (mode == LIGHT) return "claro";
-        if (mode == DARK) return "oscuro";
-        return "automático";
+    private static String label(Context context, int mode) {
+        if (mode == LIGHT) return context.getString(R.string.appearance_label_light);
+        if (mode == DARK) return context.getString(R.string.appearance_label_dark);
+        return context.getString(R.string.appearance_label_automatic);
     }
 
     static void reset(Context context) {

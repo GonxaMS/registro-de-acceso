@@ -82,8 +82,9 @@ public final class SettingsActivity extends AppCompatActivity {
         boolean keys = AppPreferences.START_KEYS.equals(
             AppPreferences.get(this).getString(AppPreferences.START_SCREEN_KEY,
                 AppPreferences.START_PERSONAL));
-        startScreen.setText("Pantalla inicial: " + (keys ? "Llaves" : "Personal"));
-        reminderTime.setText(String.format(Locale.US, "Hora del recordatorio: %02d:%02d",
+        startScreen.setText(getString(R.string.settings_start_screen,
+            getString(keys ? R.string.settings_start_keys : R.string.settings_start_personal)));
+        reminderTime.setText(getString(R.string.settings_reminder_time,
             AppPreferences.reminderHour(this), AppPreferences.reminderMinute(this)));
     }
 
@@ -111,12 +112,15 @@ public final class SettingsActivity extends AppCompatActivity {
     }
 
     private void chooseStartScreen() {
-        String[] options = {"Personal", "Llaves"};
+        String[] options = {
+            getString(R.string.settings_start_personal),
+            getString(R.string.settings_start_keys)
+        };
         boolean keys = AppPreferences.START_KEYS.equals(
             AppPreferences.get(this).getString(AppPreferences.START_SCREEN_KEY,
                 AppPreferences.START_PERSONAL));
         new AlertDialog.Builder(this)
-            .setTitle("Pantalla inicial")
+            .setTitle(R.string.settings_start_title)
             .setSingleChoiceItems(options, keys ? 1 : 0, (dialog, which) -> {
                 AppPreferences.get(this).edit().putString(AppPreferences.START_SCREEN_KEY,
                     which == 1 ? AppPreferences.START_KEYS : AppPreferences.START_PERSONAL).apply();
@@ -129,7 +133,7 @@ public final class SettingsActivity extends AppCompatActivity {
 
     private void chooseUserName() {
         EditText input = new EditText(this);
-        input.setHint("Nombre del usuario");
+        input.setHint(R.string.settings_user_name_hint);
         input.setSingleLine(true);
         input.setSelectAllOnFocus(true);
         input.setText(AppPreferences.get(this).getString(AccessActivity.USER_NAME_KEY, ""));
@@ -137,11 +141,11 @@ public final class SettingsActivity extends AppCompatActivity {
         input.setPadding(horizontalPadding, input.getPaddingTop(),
             horizontalPadding, input.getPaddingBottom());
         AlertDialog dialog = new AlertDialog.Builder(this)
-            .setTitle("Cambiar usuario")
-            .setMessage("Los próximos movimientos quedarán registrados con este nombre.")
+            .setTitle(R.string.settings_change_user_title)
+            .setMessage(R.string.settings_change_user_message)
             .setView(input)
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Guardar", null)
+            .setNegativeButton(R.string.settings_cancel, null)
+            .setPositiveButton(R.string.settings_save, null)
             .create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
             .setOnClickListener(view -> {
@@ -153,7 +157,8 @@ public final class SettingsActivity extends AppCompatActivity {
                 AppPreferences.get(this).edit()
                     .putString(AccessActivity.USER_NAME_KEY, name).apply();
                 dialog.dismiss();
-                Toast.makeText(this, "Usuario cambiado a " + name, Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.settings_user_changed, name),
+                    Toast.LENGTH_SHORT).show();
             }));
         dialog.show();
     }
@@ -164,10 +169,10 @@ public final class SettingsActivity extends AppCompatActivity {
 
     private void confirmReset() {
         new AlertDialog.Builder(this)
-            .setTitle("Restaurar preferencias")
-            .setMessage("Se restaurarán la apariencia, la pantalla inicial y los recordatorios.")
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Restaurar", (dialog, which) -> {
+            .setTitle(R.string.settings_reset_title)
+            .setMessage(R.string.settings_reset_message)
+            .setNegativeButton(R.string.settings_cancel, null)
+            .setPositiveButton(R.string.settings_reset, (dialog, which) -> {
                 AppPreferences.get(this).edit()
                     .remove(AppPreferences.START_SCREEN_KEY)
                     .remove(AppPreferences.REMINDERS_ENABLED_KEY)
@@ -180,7 +185,7 @@ public final class SettingsActivity extends AppCompatActivity {
                 render();
                 remindersSwitch.setChecked(AppPreferences.remindersEnabled(this));
                 vibrationSwitch.setChecked(AppPreferences.vibrationEnabled(this));
-                Toast.makeText(this, "Preferencias restauradas", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, R.string.settings_restored, Toast.LENGTH_SHORT).show();
             })
             .show();
     }
@@ -191,9 +196,8 @@ public final class SettingsActivity extends AppCompatActivity {
             if (isFinishing() || !AdminAccess.ADMIN.equals(role)) return;
             adminButton.setVisibility(View.VISIBLE);
             info.setVisibility(View.VISIBLE);
-            info.setText("Información técnica\nVersión " + BuildConfig.VERSION_NAME
-                + " · código " + BuildConfig.VERSION_CODE
-                + "\nPaquete " + getPackageName());
+            info.setText(getString(R.string.settings_technical_info, BuildConfig.VERSION_NAME,
+                BuildConfig.VERSION_CODE, getPackageName()));
         });
     }
 
@@ -206,7 +210,7 @@ public final class SettingsActivity extends AppCompatActivity {
             AppPreferences.get(this).edit()
                 .putBoolean(AppPreferences.REMINDERS_ENABLED_KEY, false).apply();
             ReminderScheduler.schedule(this);
-            Toast.makeText(this, "Las notificaciones quedaron desactivadas", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, R.string.settings_notifications_disabled, Toast.LENGTH_LONG).show();
         }
     }
 }

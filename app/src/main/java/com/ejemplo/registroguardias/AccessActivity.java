@@ -378,17 +378,17 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
             return;
         }
         PopupMenu menu = new PopupMenu(this, anchor);
-        menu.getMenu().add("Modificar hora");
-        menu.getMenu().add("Quitar ingreso de hoy");
-        menu.getMenu().add("Quitar salida de hoy");
-        menu.getMenu().add("Quitar operario");
-        menu.getMenu().add("Ocultar operario");
+        menu.getMenu().add(R.string.menu_modify_time);
+        menu.getMenu().add(R.string.menu_cancel_entry);
+        menu.getMenu().add(R.string.menu_cancel_exit);
+        menu.getMenu().add(R.string.menu_remove_person);
+        menu.getMenu().add(R.string.menu_hide_person);
         menu.setOnMenuItemClickListener(item -> {
             String option = item.getTitle().toString();
-            if (option.startsWith("Modificar")) loadTodayMovements(person);
-            else if (option.startsWith("Quitar ingreso")) startCancellation(person, "Ingreso");
-            else if (option.startsWith("Quitar salida")) startCancellation(person, "Salida");
-            else if (option.startsWith("Quitar operario")) confirmRemove(person);
+            if (option.equals(getString(R.string.menu_modify_time))) loadTodayMovements(person);
+            else if (option.equals(getString(R.string.menu_cancel_entry))) startCancellation(person, "Ingreso");
+            else if (option.equals(getString(R.string.menu_cancel_exit))) startCancellation(person, "Salida");
+            else if (option.equals(getString(R.string.menu_remove_person))) confirmRemove(person);
             else confirmHide(person);
             return true;
         });
@@ -397,14 +397,14 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
 
     private void showMainMenu(View anchor) {
         PopupMenu menu = new PopupMenu(this, anchor);
-        menu.getMenu().add("Agregar operario");
-        menu.getMenu().add("Mostrar operarios ocultos");
-        menu.getMenu().add("Ajustes");
+        menu.getMenu().add(R.string.menu_add_person);
+        menu.getMenu().add(R.string.menu_show_hidden_people);
+        menu.getMenu().add(R.string.menu_settings);
         menu.setOnMenuItemClickListener(item -> {
             String option = item.getTitle().toString();
-            if (option.startsWith("Agregar")) showAddDialog();
-            else if (option.startsWith("Mostrar")) showHiddenPeople();
-            else if (option.startsWith("Ajustes")) {
+            if (option.equals(getString(R.string.menu_add_person))) showAddDialog();
+            else if (option.equals(getString(R.string.menu_show_hidden_people))) showHiddenPeople();
+            else if (option.equals(getString(R.string.menu_settings))) {
                 startActivity(new Intent(this, SettingsActivity.class));
             }
             return true;

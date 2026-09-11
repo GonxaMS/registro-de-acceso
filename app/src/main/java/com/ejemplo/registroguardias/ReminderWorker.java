@@ -69,13 +69,18 @@ public final class ReminderWorker extends Worker {
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pendingIntent = PendingIntent.getActivity(context, NOTIFICATION_ID, intent,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        String people = pending == 1 ? "1 persona" : pending + " personas";
+        String content = pending == 1
+            ? context.getString(R.string.notification_content_one)
+            : context.getString(R.string.notification_content_many, pending);
+        String bigText = pending == 1
+            ? context.getString(R.string.notification_big_text_one)
+            : context.getString(R.string.notification_big_text_many, pending);
         NotificationCompat.Builder notification = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Recordatorio de salidas")
-            .setContentText("Hay " + people + " dentro sin salida registrada")
+            .setContentTitle(context.getString(R.string.notification_title))
+            .setContentText(content)
             .setStyle(new NotificationCompat.BigTextStyle()
-                .bigText("Hay " + people + " dentro sin salida registrada. Toca para revisar."))
+                .bigText(bigText))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT);
@@ -89,8 +94,8 @@ public final class ReminderWorker extends Worker {
     private static void createChannel(Context context) {
         if (Build.VERSION.SDK_INT < 26) return;
         NotificationChannel channel = new NotificationChannel(CHANNEL_ID,
-            "Recordatorios de salidas", NotificationManager.IMPORTANCE_DEFAULT);
-        channel.setDescription("Avisos cuando quedan personas dentro sin salida registrada");
+            context.getString(R.string.notification_channel_name), NotificationManager.IMPORTANCE_DEFAULT);
+        channel.setDescription(context.getString(R.string.notification_channel_description));
         NotificationManager manager = context.getSystemService(NotificationManager.class);
         if (manager != null) manager.createNotificationChannel(channel);
     }
