@@ -11,7 +11,6 @@ final class ThemeMode {
     static final int LIGHT = 1;
     static final int DARK = 2;
 
-    private static final String PREFS_NAME = "registro_guardias";
     private static final String KEY = "theme_mode";
 
     private ThemeMode() {}
@@ -29,8 +28,7 @@ final class ThemeMode {
         new android.app.AlertDialog.Builder(activity)
             .setTitle("Apariencia")
             .setSingleChoiceItems(options, saved(activity), (dialog, which) -> {
-                activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                    .edit().putInt(KEY, which).apply();
+                AppPreferences.get(activity).edit().putInt(KEY, which).apply();
                 dialog.dismiss();
                 AppCompatDelegate.setDefaultNightMode(toNightMode(which));
             })
@@ -39,7 +37,7 @@ final class ThemeMode {
     }
 
     private static int saved(Context context) {
-        SharedPreferences preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences preferences = AppPreferences.get(context);
         int mode = preferences.getInt(KEY, AUTOMATIC);
         return mode < AUTOMATIC || mode > DARK ? AUTOMATIC : mode;
     }
@@ -54,5 +52,10 @@ final class ThemeMode {
         if (mode == LIGHT) return "claro";
         if (mode == DARK) return "oscuro";
         return "automático";
+    }
+
+    static void reset(Context context) {
+        AppPreferences.get(context).edit().remove(KEY).apply();
+        apply(context);
     }
 }

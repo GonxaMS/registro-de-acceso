@@ -449,6 +449,7 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
     }
 
     private void successHaptic() {
+        if (!AppPreferences.vibrationEnabled(this)) return;
         getWindow().getDecorView().performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
     }
 
@@ -470,11 +471,13 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
         PopupMenu menu = new PopupMenu(this, anchor);
         menu.getMenu().add("Agregar llave");
         menu.getMenu().add("Mostrar llaves ocultas");
+        menu.getMenu().add("Ajustes");
         menu.getMenu().add(ThemeMode.menuLabel(this));
         menu.setOnMenuItemClickListener(item -> {
             String option = item.getTitle().toString();
             if (option.startsWith("Agregar")) showAddDialog();
             else if (option.startsWith("Mostrar")) showHiddenKeys();
+            else if (option.startsWith("Ajustes")) startActivity(new Intent(this, SettingsActivity.class));
             else ThemeMode.showChooser(this);
             return true;
         });

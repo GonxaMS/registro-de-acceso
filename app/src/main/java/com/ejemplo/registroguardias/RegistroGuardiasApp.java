@@ -12,5 +12,6 @@ public final class RegistroGuardiasApp extends Application {
             FirebaseAuth.getInstance().useEmulator("10.0.2.2", 9099);
             FirebaseFirestore.getInstance().useEmulator("10.0.2.2", 8080);
         }
+        ReminderScheduler.schedule(this);
     }
 }

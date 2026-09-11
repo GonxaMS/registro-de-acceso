@@ -47,6 +47,7 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
     static final String PREFS_NAME = "registro_guardias";
     static final String USER_NAME_KEY = "operator_user_name";
     static final String SHEETS_WEB_URL = BuildConfig.SHEETS_WEB_URL;
+    static final String EXTRA_OPEN_INSIDE_FILTER = "open_inside_filter";
 
     private final List<Person> visiblePeople = new ArrayList<>();
     private final List<Person> hiddenPeople = new ArrayList<>();
@@ -80,6 +81,16 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
             startActivity(new Intent(this, SetupActivity.class));
             finish();
             return;
+        }
+        boolean openInsideFilter = getIntent().getBooleanExtra(EXTRA_OPEN_INSIDE_FILTER, false);
+        if (state == null && !openInsideFilter && AppPreferences.START_KEYS.equals(
+            preferences.getString(AppPreferences.START_SCREEN_KEY, AppPreferences.START_PERSONAL))) {
+            startActivity(new Intent(this, KeysActivity.class));
+            finish();
+            return;
+        }
+        if (openInsideFilter) {
+            peopleFilter = PEOPLE_FILTER_INSIDE;
         }
 
         setContentView(R.layout.activity_main);
@@ -345,6 +356,7 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
     }
 
     private void successHaptic() {
+        if (!AppPreferences.vibrationEnabled(this)) return;
         getWindow().getDecorView().performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
     }
 
@@ -391,6 +403,7 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
         menu.getMenu().add("Mostrar operarios ocultos");
         if (admin) menu.getMenu().add("Administración");
         menu.getMenu().add("Cambiar usuario");
+        menu.getMenu().add("Ajustes");
         menu.getMenu().add(ThemeMode.menuLabel(this));
         menu.getMenu().add("Versión " + BuildConfig.VERSION_NAME).setEnabled(false);
         menu.setOnMenuItemClickListener(item -> {
@@ -399,6 +412,9 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
             else if (option.startsWith("Mostrar")) showHiddenPeople();
             else if (option.startsWith("Administración")) {
                 startActivity(new Intent(this, AdminDashboardActivity.class));
+            }
+            else if (option.startsWith("Ajustes")) {
+                startActivity(new Intent(this, SettingsActivity.class));
             }
             else if (option.startsWith("Apariencia")) ThemeMode.showChooser(this);
             else showChangeUserDialog();
@@ -886,5 +902,13 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
         if (keysListener != null) keysListener.remove();
         if (networkMonitor != null) networkMonitor.stop();
         super.onDestroy();
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent.getBooleanExtra(EXTRA_OPEN_INSIDE_FILTER, false) && search != null) {
+            setPeopleFilter(PEOPLE_FILTER_INSIDE);
+        }
     }
 }

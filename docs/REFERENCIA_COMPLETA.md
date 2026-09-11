@@ -1,6 +1,6 @@
 # Referencia completa y estado del proyecto
 
-Documento actualizado para la versión 3.9.21. Describe el comportamiento vigente, las decisiones
+Documento actualizado para la versión 3.9.22. Describe el comportamiento vigente, las decisiones
 aceptadas y los riesgos pendientes. Firebase es la fuente de verdad; Google Sheets es una copia
 operativa secundaria.
 
