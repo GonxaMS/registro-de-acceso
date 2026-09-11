@@ -248,8 +248,8 @@ Paquete %3$s</string>
     <string name="key_holder_detail">La tiene %1$s desde %2$s %3$s</string>
     <string name="key_ready_detail">Lista para retirar</string>
     <string name="setup_user_error">Escribe el nombre del usuario</string>
-    <string name="date_format_full">EEEE d 'de' MMMM 'de' yyyy</string>
-    <string name="date_format_month">MMMM 'de' yyyy</string>
+    <string name="date_format_full">EEEE d \'de\' MMMM \'de\' yyyy</string>
+    <string name="date_format_month">MMMM \'de\' yyyy</string>
     <string name="date_format_timestamp">dd/MM/yyyy HH:mm</string>
     <string name="date_format_short_timestamp">dd/MM HH:mm</string>
     <string name="key_load_title">Llaves</string>
