@@ -63,8 +63,11 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
     private TextView peopleFilterAll;
     private TextView peopleFilterInside;
     private TextView peopleFilterOutside;
+    private TextView offlineBanner;
     private PeopleAdapter adapter;
+    private NetworkMonitor networkMonitor;
     private boolean admin;
+    private boolean networkAvailable = true;
     private String peopleFilter = PEOPLE_FILTER_ALL;
 
     @Override public void onCreate(Bundle state) {
@@ -84,6 +87,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
         peopleFilterAll = findViewById(R.id.filterPeopleAll);
         peopleFilterInside = findViewById(R.id.filterPeopleInside);
         peopleFilterOutside = findViewById(R.id.filterPeopleOutside);
+        offlineBanner = findViewById(R.id.offlineBanner);
         adapter = new PeopleAdapter(this, filteredPeople, this);
         adapter.setToday(today());
         ((ListView) findViewById(R.id.listPeople)).setAdapter(adapter);
@@ -98,6 +102,8 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
         peopleFilterInside.setOnClickListener(view -> setPeopleFilter(PEOPLE_FILTER_INSIDE));
         peopleFilterOutside.setOnClickListener(view -> setPeopleFilter(PEOPLE_FILTER_OUTSIDE));
         updatePeopleFilterButtons();
+        networkMonitor = new NetworkMonitor(this, this::updateNetworkState);
+        networkMonitor.start();
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence text, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence text, int start, int before, int count) {
@@ -240,7 +246,19 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
         peopleFilterOutside.setSelected(PEOPLE_FILTER_OUTSIDE.equals(peopleFilter));
     }
 
+    private void updateNetworkState(boolean available) {
+        runOnUiThread(() -> {
+            networkAvailable = available;
+            offlineBanner.setVisibility(available ? View.GONE : View.VISIBLE);
+            if (adapter != null) adapter.notifyDataSetChanged();
+        });
+    }
+
     @Override public void onMovement(Person person, String type) {
+        if (!networkAvailable) {
+            toast("Sin conexion: la operacion esta bloqueada");
+            return;
+        }
         if (!pendingMovements.add(person.id)) return;
         adapter.notifyDataSetChanged();
         boolean entry = "Ingreso".equals(type);
@@ -312,6 +330,10 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
         return pendingMovements.contains(person.id);
     }
 
+    @Override public boolean isNetworkAvailable() {
+        return networkAvailable;
+    }
+
     private void finishMovement(String personId) {
         pendingMovements.remove(personId);
         adapter.notifyDataSetChanged();
@@ -332,6 +354,10 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
     }
 
     @Override public void onOptions(View anchor, Person person) {
+        if (!networkAvailable) {
+            toast("Sin conexion: las operaciones estan bloqueadas");
+            return;
+        }
         PopupMenu menu = new PopupMenu(this, anchor);
         menu.getMenu().add("Modificar hora");
         menu.getMenu().add("Quitar ingreso de hoy");
@@ -832,6 +858,7 @@ public final class AccessActivity extends Activity implements PeopleAdapter.Acti
     @Override protected void onDestroy() {
         if (peopleListener != null) peopleListener.remove();
         if (keysListener != null) keysListener.remove();
+        if (networkMonitor != null) networkMonitor.stop();
         super.onDestroy();
     }
 }

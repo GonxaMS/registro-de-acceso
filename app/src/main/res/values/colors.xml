@@ -20,4 +20,6 @@
     <color name="filter_unselected">#EAF1FC</color>
     <color name="filter_selected_text">#FFFFFF</color>
     <color name="filter_unselected_text">#21436F</color>
+    <color name="offline_banner">#B3261E</color>
+    <color name="offline_banner_text">#FFFFFF</color>
 </resources>

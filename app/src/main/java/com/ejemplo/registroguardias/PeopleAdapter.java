@@ -15,6 +15,7 @@ final class PeopleAdapter extends BaseAdapter {
         void onMovement(Person person, String type);
         void onOptions(View anchor, Person person);
         boolean isMovementPending(Person person);
+        boolean isNetworkAvailable();
     }
 
     private final AccessActivity activity;
@@ -50,13 +51,16 @@ final class PeopleAdapter extends BaseAdapter {
         boolean inside = "Dentro".equals(person.state);
         boolean completed = !inside && today.equals(person.date) && "Salida".equals(person.lastMovement);
         boolean pending = actions.isMovementPending(person);
+        boolean networkAvailable = actions.isNetworkAvailable();
 
         holder.name.setText(person.name);
         holder.status.setText(inside ? "● Dentro" : completed ? "✓ Completado" : "● Fuera");
         holder.status.setTextColor(Color.parseColor(inside ? "#1B7F4B" : completed ? "#1769AA" : "#5E6C84"));
 
-        setEnabled(holder.entry, !pending && !inside && !completed);
-        setEnabled(holder.exit, !pending && inside);
+        setEnabled(holder.entry, networkAvailable && !pending && !inside && !completed);
+        setEnabled(holder.exit, networkAvailable && !pending && inside);
+        holder.options.setEnabled(networkAvailable);
+        holder.options.setAlpha(networkAvailable ? 1f : 0.45f);
         holder.entry.setOnClickListener(view -> actions.onMovement(person, "Ingreso"));
         holder.exit.setOnClickListener(view -> actions.onMovement(person, "Salida"));
         holder.options.setOnClickListener(view -> actions.onOptions(view, person));

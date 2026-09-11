@@ -62,7 +62,10 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
     private TextView keysFilterAll;
     private TextView keysFilterAvailable;
     private TextView keysFilterBorrowed;
+    private TextView offlineBanner;
     private KeysAdapter adapter;
+    private NetworkMonitor networkMonitor;
+    private boolean networkAvailable = true;
     private String keysFilter = KEYS_FILTER_ALL;
 
     @Override public void onCreate(Bundle state) {
@@ -76,6 +79,7 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
         keysFilterAll = findViewById(R.id.filterKeysAll);
         keysFilterAvailable = findViewById(R.id.filterKeysAvailable);
         keysFilterBorrowed = findViewById(R.id.filterKeysBorrowed);
+        offlineBanner = findViewById(R.id.offlineBanner);
         adapter = new KeysAdapter(this, filteredKeys, this);
         ((ListView) findViewById(R.id.listKeys)).setAdapter(adapter);
         ((TextView) findViewById(R.id.txtKeysToday)).setText(
@@ -88,6 +92,8 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
         keysFilterAvailable.setOnClickListener(view -> setKeysFilter(KEYS_FILTER_AVAILABLE));
         keysFilterBorrowed.setOnClickListener(view -> setKeysFilter(KEYS_FILTER_BORROWED));
         updateKeysFilterButtons();
+        networkMonitor = new NetworkMonitor(this, this::updateNetworkState);
+        networkMonitor.start();
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence text, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence text, int start, int before, int count) {
@@ -248,7 +254,23 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
     }
 
     @Override public void onKeyMovement(KeyItem key, String type) {
+        if (!networkAvailable) {
+            toast("Sin conexion: la operacion esta bloqueada");
+            return;
+        }
         showPersonSelector(key, type);
+    }
+
+    @Override public boolean isNetworkAvailable() {
+        return networkAvailable;
+    }
+
+    private void updateNetworkState(boolean available) {
+        runOnUiThread(() -> {
+            networkAvailable = available;
+            offlineBanner.setVisibility(available ? View.GONE : View.VISIBLE);
+            if (adapter != null) adapter.notifyDataSetChanged();
+        });
     }
 
     private void showPersonSelector(KeyItem key, String type) {
@@ -422,6 +444,10 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
     }
 
     @Override public void onKeyOptions(View anchor, KeyItem key) {
+        if (!networkAvailable) {
+            toast("Sin conexion: las operaciones estan bloqueadas");
+            return;
+        }
         PopupMenu menu = new PopupMenu(this, anchor);
         menu.getMenu().add("Ocultar llave");
         menu.setOnMenuItemClickListener(item -> {
@@ -655,6 +681,7 @@ public final class KeysActivity extends Activity implements KeysAdapter.Actions 
         if (keysListener != null) keysListener.remove();
         if (peopleListener != null) peopleListener.remove();
         if (keyPeopleListener != null) keyPeopleListener.remove();
+        if (networkMonitor != null) networkMonitor.stop();
         super.onDestroy();
     }
 }
