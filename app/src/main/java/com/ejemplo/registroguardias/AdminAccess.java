@@ -13,6 +13,10 @@ final class AdminAccess {
         void onResult(boolean allowed, String uid);
     }
 
+    interface DetailedCallback {
+        void onResult(boolean allowed, String role, Exception error);
+    }
+
     private AdminAccess() {}
 
     static void checkRole(FirebaseFirestore database, Callback callback) {
@@ -34,6 +38,27 @@ final class AdminAccess {
                     .addOnFailureListener(error -> callback.onResult(false, BLOCKED));
             })
             .addOnFailureListener(error -> callback.onResult(false, BLOCKED));
+    }
+
+    static void checkRoleWithError(FirebaseFirestore database, DetailedCallback callback) {
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) {
+            callback.onResult(false, BLOCKED, new IllegalStateException("No authenticated user"));
+            return;
+        }
+        String uid = user.getUid();
+        database.collection("administradores").document(uid).get()
+            .addOnSuccessListener(admin -> {
+                if (admin.exists() && Boolean.TRUE.equals(admin.getBoolean("activo"))) {
+                    callback.onResult(true, ADMIN, null);
+                    return;
+                }
+                database.collection("dispositivos").document(uid).get()
+                    .addOnSuccessListener(device -> callback.onResult(false,
+                        NORMAL.equals(device.getString("estado")) ? NORMAL : BLOCKED, null))
+                    .addOnFailureListener(error -> callback.onResult(false, BLOCKED, error));
+            })
+            .addOnFailureListener(error -> callback.onResult(false, BLOCKED, error));
     }
 
     static void check(FirebaseFirestore database, Callback callback) {

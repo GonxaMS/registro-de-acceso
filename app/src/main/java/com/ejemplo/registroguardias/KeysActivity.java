@@ -5,6 +5,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.HapticFeedbackConstants;
@@ -40,6 +42,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 public final class KeysActivity extends AppCompatActivity implements KeysAdapter.Actions {
+    private static final long DATA_LOAD_TIMEOUT_MS = 5_000L;
     private static final String KEYS_FILTER_ALL = "all";
     private static final String KEYS_FILTER_AVAILABLE = "available";
     private static final String KEYS_FILTER_BORROWED = "borrowed";
@@ -69,6 +72,15 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
     private NetworkMonitor networkMonitor;
     private boolean networkAvailable = true;
     private String keysFilter = KEYS_FILTER_ALL;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private Runnable loadTimeout;
+    private Runnable reconnectRetry;
+    private AlertDialog loadErrorDialog;
+    private boolean loadAttemptActive;
+    private boolean keysLoaded;
+    private boolean peopleLoaded;
+    private boolean keyPeopleLoaded;
+    private boolean roleCheckInProgress;
 
     @Override public void onCreate(Bundle state) {
         ThemeMode.apply(this);
@@ -108,16 +120,76 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
 
         count.setText(R.string.loading_keys);
         database = FirebaseFirestore.getInstance();
-        AdminAccess.checkRole(database, (admin, role) -> {
+        beginLoadAttempt();
+        checkAccessAndLoad();
+    }
+
+    private void checkAccessAndLoad() {
+        if (database == null || roleCheckInProgress || !loadAttemptActive || isFinishing()) return;
+        roleCheckInProgress = true;
+        AdminAccess.checkRoleWithError(database, (admin, role, error) -> {
+            roleCheckInProgress = false;
+            if (!loadAttemptActive || isFinishing()) return;
+            if (error != null) {
+                failLoad(error, getString(R.string.key_load_title));
+                return;
+            }
             if (AdminAccess.BLOCKED.equals(role)) {
+                loadAttemptActive = false;
+                cancelLoadTimeout();
                 startActivity(new Intent(this, BlockedActivity.class));
                 finish();
                 return;
             }
-            listenForKeys();
-            listenForPeople();
-            listenForKeyOnlyPeople();
+            startDataListeners();
         });
+    }
+
+    private void beginLoadAttempt() {
+        cancelLoadTimeout();
+        removeDataListeners();
+        loadAttemptActive = true;
+        keysLoaded = false;
+        peopleLoaded = false;
+        keyPeopleLoaded = false;
+        if (count != null) count.setText(R.string.loading_keys);
+        loadTimeout = () -> {
+            if (loadAttemptActive) {
+                failLoad(new IllegalStateException(getString(R.string.load_timeout_message)),
+                    getString(R.string.key_load_title));
+            }
+        };
+        mainHandler.postDelayed(loadTimeout, DATA_LOAD_TIMEOUT_MS);
+    }
+
+    private void retryInitialLoad() {
+        if (isFinishing() || database == null) return;
+        dismissLoadErrorDialog();
+        beginLoadAttempt();
+        checkAccessAndLoad();
+    }
+
+    private void startDataListeners() {
+        if (!loadAttemptActive || database == null || isFinishing()) return;
+        removeDataListeners();
+        listenForKeys();
+        listenForPeople();
+        listenForKeyOnlyPeople();
+    }
+
+    private void removeDataListeners() {
+        if (keysListener != null) {
+            keysListener.remove();
+            keysListener = null;
+        }
+        if (peopleListener != null) {
+            peopleListener.remove();
+            peopleListener = null;
+        }
+        if (keyPeopleListener != null) {
+            keyPeopleListener.remove();
+            keyPeopleListener = null;
+        }
     }
 
     private void openSheets() {
@@ -141,8 +213,7 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
         if (keysListener != null) keysListener.remove();
         keysListener = database.collection("llaves").addSnapshotListener((snapshot, error) -> {
             if (error != null) {
-                showLoadError(getString(R.string.key_load_title), getString(R.string.key_load_failed),
-                    error, this::listenForKeys);
+                failLoad(error, getString(R.string.key_load_failed));
                 return;
             }
             if (snapshot == null) return;
@@ -163,6 +234,8 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
             Collections.sort(visibleKeys, byName);
             Collections.sort(hiddenKeys, byName);
             filterKeys(search.getText().toString());
+            keysLoaded = true;
+            finishLoadIfReady();
         });
     }
 
@@ -170,9 +243,7 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
         if (peopleListener != null) peopleListener.remove();
         peopleListener = database.collection("personal").addSnapshotListener((snapshot, error) -> {
             if (error != null) {
-                showLoadError(getString(R.string.people_for_keys_title),
-                    getString(R.string.people_for_keys_failed), error,
-                    this::listenForPeople);
+                failLoad(error, getString(R.string.people_for_keys_failed));
                 return;
             }
             if (snapshot == null) return;
@@ -186,6 +257,8 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
                 ));
             }
             rebuildSelectablePeople();
+            peopleLoaded = true;
+            finishLoadIfReady();
         });
     }
 
@@ -194,9 +267,7 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
         keyPeopleListener = database.collection("operariosLlaves")
             .addSnapshotListener((snapshot, error) -> {
                 if (error != null) {
-                    showLoadError(getString(R.string.key_workers_title),
-                        getString(R.string.key_workers_failed), error,
-                        this::listenForKeyOnlyPeople);
+                    failLoad(error, getString(R.string.key_workers_failed));
                     return;
                 }
                 if (snapshot == null) return;
@@ -208,7 +279,33 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
                     }
                 }
                 rebuildSelectablePeople();
+                keyPeopleLoaded = true;
+                finishLoadIfReady();
             });
+    }
+
+    private void finishLoadIfReady() {
+        if (!keysLoaded || !peopleLoaded || !keyPeopleLoaded) return;
+        loadAttemptActive = false;
+        cancelLoadTimeout();
+        dismissLoadErrorDialog();
+    }
+
+    private void failLoad(Exception error, String title) {
+        if (isFinishing()) return;
+        loadAttemptActive = false;
+        cancelLoadTimeout();
+        removeDataListeners();
+        showLoadError(title, title, error == null
+            ? new IllegalStateException(getString(R.string.load_timeout_message)) : error,
+            this::retryInitialLoad);
+    }
+
+    private void cancelLoadTimeout() {
+        if (loadTimeout != null) {
+            mainHandler.removeCallbacks(loadTimeout);
+            loadTimeout = null;
+        }
     }
 
     private void rebuildSelectablePeople() {
@@ -273,9 +370,18 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
 
     private void updateNetworkState(boolean available) {
         runOnUiThread(() -> {
+            boolean wasAvailable = networkAvailable;
             networkAvailable = available;
             offlineBanner.setVisibility(available ? View.GONE : View.VISIBLE);
             if (adapter != null) adapter.notifyDataSetChanged();
+            if (available && !wasAvailable && database != null) {
+                if (reconnectRetry != null) mainHandler.removeCallbacks(reconnectRetry);
+                reconnectRetry = () -> {
+                    reconnectRetry = null;
+                    if (networkAvailable && !isFinishing()) retryInitialLoad();
+                };
+                mainHandler.postDelayed(reconnectRetry, 300L);
+            }
         });
     }
 
@@ -685,7 +791,7 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
                 loadErrorDialogVisible = false;
                 return;
             }
-            AlertDialog dialog = new AlertDialog.Builder(this)
+            loadErrorDialog = new AlertDialog.Builder(this)
                 .setTitle(title)
                 .setMessage(friendlyError(error) + "\n\n" + getString(R.string.error_old_data_visible))
                 .setNegativeButton(R.string.dialog_close, null)
@@ -695,9 +801,18 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
                     retry.run();
                 })
                 .create();
-            dialog.setOnDismissListener(ignored -> loadErrorDialogVisible = false);
-            dialog.show();
+            loadErrorDialog.setOnDismissListener(ignored -> {
+                loadErrorDialogVisible = false;
+                loadErrorDialog = null;
+            });
+            loadErrorDialog.show();
         });
+    }
+
+    private void dismissLoadErrorDialog() {
+        if (loadErrorDialog != null && loadErrorDialog.isShowing()) loadErrorDialog.dismiss();
+        loadErrorDialog = null;
+        loadErrorDialogVisible = false;
     }
 
     private void toast(String message) {
@@ -707,8 +822,9 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
     @Override protected void onResume() {
         super.onResume();
         if (database == null || !networkAvailable) return;
-        AdminAccess.checkRole(database, (admin, role) -> {
+        AdminAccess.checkRoleWithError(database, (admin, role, error) -> {
             if (isFinishing()) return;
+            if (error != null) return;
             if (AdminAccess.BLOCKED.equals(role)) {
                 startActivity(new Intent(this, BlockedActivity.class));
                 finish();
@@ -717,9 +833,10 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
     }
 
     @Override protected void onDestroy() {
-        if (keysListener != null) keysListener.remove();
-        if (peopleListener != null) peopleListener.remove();
-        if (keyPeopleListener != null) keyPeopleListener.remove();
+        loadAttemptActive = false;
+        cancelLoadTimeout();
+        if (reconnectRetry != null) mainHandler.removeCallbacks(reconnectRetry);
+        removeDataListeners();
         if (networkMonitor != null) networkMonitor.stop();
         super.onDestroy();
     }

@@ -146,6 +146,7 @@ Paquete %3$s</string>
     <string name="error_no_permission">No tienes permiso para realizar esta acci&#243;n.</string>
     <string name="error_operation_failed">No se pudo completar la operaci&#243;n. Intenta nuevamente.</string>
     <string name="error_load_failed">No se pudo cargar</string>
+    <string name="load_timeout_message">La carga est&#225; tardando m&#225;s de lo esperado.</string>
     <string name="error_register_failed">No se puede registrar</string>
     <string name="error_remove_failed">No se pudo quitar</string>
     <string name="error_add_failed">No se pudo agregar</string>

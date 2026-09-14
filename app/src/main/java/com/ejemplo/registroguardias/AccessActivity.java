@@ -6,6 +6,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.HapticFeedbackConstants;
@@ -41,6 +43,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 public final class AccessActivity extends AppCompatActivity implements PeopleAdapter.Actions {
+    private static final long DATA_LOAD_TIMEOUT_MS = 5_000L;
     private static final String PEOPLE_FILTER_ALL = "all";
     private static final String PEOPLE_FILTER_INSIDE = "inside";
     private static final String PEOPLE_FILTER_OUTSIDE = "outside";
@@ -71,6 +74,17 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
     private NetworkMonitor networkMonitor;
     private boolean networkAvailable = true;
     private String peopleFilter = PEOPLE_FILTER_ALL;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private Runnable loadTimeout;
+    private Runnable reconnectRetry;
+    private AlertDialog loadErrorDialog;
+    private boolean loadErrorDialogVisible;
+    private boolean loadAttemptActive;
+    private boolean peopleLoaded;
+    private boolean keysLoaded;
+    private boolean authenticationInProgress;
+    private boolean deviceRegistrationInProgress;
+    private boolean roleCheckInProgress;
 
     @Override public void onCreate(Bundle state) {
         ThemeMode.apply(this);
@@ -129,11 +143,9 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
         count.setText(R.string.loading_people);
         authentication = FirebaseAuth.getInstance();
         database = FirebaseFirestore.getInstance();
+        beginLoadAttempt();
         if (authentication.getCurrentUser() != null) startListeners();
-        else authentication.signInAnonymously()
-            .addOnSuccessListener(result -> startListeners())
-            .addOnFailureListener(error -> showMessage(getString(R.string.error_no_connection_title),
-                friendlyError(error)));
+        else signInAndStart();
     }
 
     private void openSheets() {
@@ -154,11 +166,32 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
     }
 
     private void startListeners() {
+        if (isFinishing() || !loadAttemptActive) return;
+        if (authentication.getCurrentUser() == null) {
+            signInAndStart();
+            return;
+        }
         registerDevice();
     }
 
+    private void signInAndStart() {
+        if (authenticationInProgress || isFinishing() || !loadAttemptActive) return;
+        authenticationInProgress = true;
+        authentication.signInAnonymously()
+            .addOnSuccessListener(result -> {
+                authenticationInProgress = false;
+                if (loadAttemptActive && !isFinishing()) registerDevice();
+            })
+            .addOnFailureListener(error -> {
+                authenticationInProgress = false;
+                failLoad(error);
+            });
+    }
+
     private void registerDevice() {
-        if (authentication.getCurrentUser() == null) return;
+        if (authentication.getCurrentUser() == null || !loadAttemptActive
+            || deviceRegistrationInProgress || roleCheckInProgress) return;
+        deviceRegistrationInProgress = true;
         String uid = authentication.getCurrentUser().getUid();
         Map<String, Object> device = new HashMap<>();
         device.put("nombre", currentUser());
@@ -172,21 +205,82 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
                 transaction.set(reference, device);
             }
             return null;
-        }).addOnCompleteListener(task -> AdminAccess.checkRole(database, (allowed, role) -> {
-            if (AdminAccess.BLOCKED.equals(role)) {
-                startActivity(new Intent(this, BlockedActivity.class));
-                finish();
+        }).addOnCompleteListener(task -> {
+            deviceRegistrationInProgress = false;
+            if (!loadAttemptActive || isFinishing()) return;
+            if (!task.isSuccessful()) {
+                Exception error = task.getException();
+                failLoad(error == null
+                    ? new IllegalStateException(getString(R.string.error_no_connection_retry))
+                    : error);
                 return;
             }
-            listenForPeople();
-            listenForBorrowedKeys();
-        }));
+            if (roleCheckInProgress) return;
+            roleCheckInProgress = true;
+            AdminAccess.checkRoleWithError(database, (allowed, role, error) -> {
+                roleCheckInProgress = false;
+                if (!loadAttemptActive || isFinishing()) return;
+                if (error != null) {
+                    failLoad(error);
+                    return;
+                }
+                if (AdminAccess.BLOCKED.equals(role)) {
+                    loadAttemptActive = false;
+                    cancelLoadTimeout();
+                    startActivity(new Intent(this, BlockedActivity.class));
+                    finish();
+                    return;
+                }
+                startDataListeners();
+            });
+        });
+    }
+
+    private void beginLoadAttempt() {
+        cancelLoadTimeout();
+        removeDataListeners();
+        loadAttemptActive = true;
+        peopleLoaded = false;
+        keysLoaded = false;
+        if (count != null) count.setText(R.string.loading_people);
+        if (borrowedKeys != null) borrowedKeys.setText(R.string.borrowed_keys_initial);
+        loadTimeout = () -> {
+            if (loadAttemptActive) {
+                failLoad(new IllegalStateException(getString(R.string.load_timeout_message)));
+            }
+        };
+        mainHandler.postDelayed(loadTimeout, DATA_LOAD_TIMEOUT_MS);
+    }
+
+    private void retryInitialLoad() {
+        if (isFinishing() || authentication == null || database == null) return;
+        dismissLoadErrorDialog();
+        beginLoadAttempt();
+        startListeners();
+    }
+
+    private void startDataListeners() {
+        if (!loadAttemptActive || database == null || isFinishing()) return;
+        removeDataListeners();
+        listenForPeople();
+        listenForBorrowedKeys();
+    }
+
+    private void removeDataListeners() {
+        if (peopleListener != null) {
+            peopleListener.remove();
+            peopleListener = null;
+        }
+        if (keysListener != null) {
+            keysListener.remove();
+            keysListener = null;
+        }
     }
 
     private void listenForPeople() {
         peopleListener = database.collection("personal").addSnapshotListener((snapshot, error) -> {
             if (error != null) {
-                showMessage(getString(R.string.error_load_failed), friendlyError(error));
+                failLoad(error);
                 return;
             }
             if (snapshot == null) return;
@@ -210,15 +304,18 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
             Collections.sort(hiddenPeople, byName);
             Collections.sort(removedPeople, byName);
             filterPeople(search.getText().toString());
+            peopleLoaded = true;
+            finishLoadIfReady();
         });
     }
 
     private void listenForBorrowedKeys() {
         keysListener = database.collection("llaves").addSnapshotListener((snapshot, error) -> {
-            if (error != null || snapshot == null) {
-                borrowedKeys.setText(R.string.borrowed_keys_unavailable);
+            if (error != null) {
+                failLoad(error);
                 return;
             }
+            if (snapshot == null) return;
             int borrowed = 0;
             for (DocumentSnapshot document : snapshot.getDocuments()) {
                 Boolean active = document.getBoolean("activo");
@@ -226,7 +323,33 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
                 if ("Prestada".equals(document.getString("estado"))) borrowed++;
             }
             borrowedKeys.setText(getString(R.string.borrowed_keys_count, borrowed));
+            keysLoaded = true;
+            finishLoadIfReady();
         });
+    }
+
+    private void finishLoadIfReady() {
+        if (!peopleLoaded || !keysLoaded) return;
+        loadAttemptActive = false;
+        cancelLoadTimeout();
+        dismissLoadErrorDialog();
+    }
+
+    private void failLoad(Exception error) {
+        if (isFinishing()) return;
+        loadAttemptActive = false;
+        cancelLoadTimeout();
+        removeDataListeners();
+        Exception safeError = error == null
+            ? new IllegalStateException(getString(R.string.load_timeout_message)) : error;
+        showLoadError(getString(R.string.error_load_failed), safeError, this::retryInitialLoad);
+    }
+
+    private void cancelLoadTimeout() {
+        if (loadTimeout != null) {
+            mainHandler.removeCallbacks(loadTimeout);
+            loadTimeout = null;
+        }
     }
 
     private void filterPeople(String query) {
@@ -262,9 +385,18 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
 
     private void updateNetworkState(boolean available) {
         runOnUiThread(() -> {
+            boolean wasAvailable = networkAvailable;
             networkAvailable = available;
             offlineBanner.setVisibility(available ? View.GONE : View.VISIBLE);
             if (adapter != null) adapter.notifyDataSetChanged();
+            if (available && !wasAvailable && database != null && authentication != null) {
+                if (reconnectRetry != null) mainHandler.removeCallbacks(reconnectRetry);
+                reconnectRetry = () -> {
+                    reconnectRetry = null;
+                    if (networkAvailable && !isFinishing()) retryInitialLoad();
+                };
+                mainHandler.postDelayed(reconnectRetry, 300L);
+            }
         });
     }
 
@@ -889,6 +1021,37 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
             .setTitle(title).setMessage(message).setPositiveButton(R.string.dialog_accept, null).show());
     }
 
+    private void showLoadError(String title, Exception error, Runnable retry) {
+        if (loadErrorDialogVisible || isFinishing()) return;
+        loadErrorDialogVisible = true;
+        runOnUiThread(() -> {
+            if (isFinishing()) {
+                loadErrorDialogVisible = false;
+                return;
+            }
+            loadErrorDialog = new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(friendlyError(error) + "\n\n" + getString(R.string.error_old_data_visible))
+                .setNegativeButton(R.string.dialog_close, null)
+                .setPositiveButton(R.string.dialog_retry, (ignored, which) -> {
+                    loadErrorDialogVisible = false;
+                    retry.run();
+                })
+                .create();
+            loadErrorDialog.setOnDismissListener(ignored -> {
+                loadErrorDialogVisible = false;
+                loadErrorDialog = null;
+            });
+            loadErrorDialog.show();
+        });
+    }
+
+    private void dismissLoadErrorDialog() {
+        if (loadErrorDialog != null && loadErrorDialog.isShowing()) loadErrorDialog.dismiss();
+        loadErrorDialog = null;
+        loadErrorDialogVisible = false;
+    }
+
     private void toast(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
@@ -897,8 +1060,9 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
         super.onResume();
         if (database == null || authentication == null
             || authentication.getCurrentUser() == null || !networkAvailable) return;
-        AdminAccess.checkRole(database, (allowed, role) -> {
+        AdminAccess.checkRoleWithError(database, (allowed, role, error) -> {
             if (isFinishing()) return;
+            if (error != null) return;
             if (AdminAccess.BLOCKED.equals(role)) {
                 startActivity(new Intent(this, BlockedActivity.class));
                 finish();
@@ -908,8 +1072,10 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
     }
 
     @Override protected void onDestroy() {
-        if (peopleListener != null) peopleListener.remove();
-        if (keysListener != null) keysListener.remove();
+        loadAttemptActive = false;
+        cancelLoadTimeout();
+        if (reconnectRetry != null) mainHandler.removeCallbacks(reconnectRetry);
+        removeDataListeners();
         if (networkMonitor != null) networkMonitor.stop();
         super.onDestroy();
     }
