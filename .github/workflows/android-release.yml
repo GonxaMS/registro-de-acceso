@@ -40,8 +40,8 @@ jobs:
           done
           printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
           printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 --decode > registro-guardia-release.jks
+          printf 'sheets.web_url=%s\n' "$SHEETS_WEB_URL" > local.properties
           {
-            printf 'sheets.web_url=%s\n' "$SHEETS_WEB_URL"
             printf 'storeFile=registro-guardia-release.jks\n'
             printf 'storePassword=%s\n' "$SIGNING_STORE_PASSWORD"
             printf 'keyAlias=%s\n' "$SIGNING_KEY_ALIAS"
@@ -59,4 +59,4 @@ jobs:
 
       - name: Remove signing material
         if: always()
-        run: rm -f registro-guardia-release.jks keystore.properties app/google-services.json
+        run: rm -f registro-guardia-release.jks keystore.properties local.properties app/google-services.json
