@@ -12,6 +12,8 @@ final class AppPreferences {
     static final String REMINDER_HOUR_KEY = "reminder_hour";
     static final String REMINDER_MINUTE_KEY = "reminder_minute";
     static final String VIBRATION_ENABLED_KEY = "vibration_enabled";
+    static final String LARGE_TEXT_KEY = "large_text";
+    static final String HIGH_CONTRAST_KEY = "high_contrast";
     static final int DEFAULT_REMINDER_HOUR = 21;
     static final int DEFAULT_REMINDER_MINUTE = 0;
 
@@ -35,5 +37,13 @@ final class AppPreferences {
 
     static boolean vibrationEnabled(Context context) {
         return get(context).getBoolean(VIBRATION_ENABLED_KEY, true);
+    }
+
+    static boolean largeTextEnabled(Context context) {
+        return get(context).getBoolean(LARGE_TEXT_KEY, false);
+    }
+
+    static boolean highContrastEnabled(Context context) {
+        return get(context).getBoolean(HIGH_CONTRAST_KEY, false);
     }
 }

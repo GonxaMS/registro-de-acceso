@@ -24,6 +24,7 @@ import com.google.firebase.firestore.QuerySnapshot;
 public final class ReminderWorker extends Worker {
     private static final String CHANNEL_ID = "exit_reminders";
     private static final int NOTIFICATION_ID = 7301;
+    private static final int TEST_NOTIFICATION_ID = 7302;
 
     public ReminderWorker(Context context, WorkerParameters parameters) {
         super(context, parameters);
@@ -39,42 +40,59 @@ public final class ReminderWorker extends Worker {
             return Result.success();
         }
         try {
-            QuerySnapshot snapshot = Tasks.await(
+            QuerySnapshot peopleSnapshot = Tasks.await(
                 FirebaseFirestore.getInstance().collection("personal").get());
-            int pending = 0;
-            for (DocumentSnapshot document : snapshot.getDocuments()) {
-                if (Boolean.TRUE.equals(document.getBoolean("retirado"))) continue;
-                if (Boolean.FALSE.equals(document.getBoolean("activo"))) continue;
-                if ("Dentro".equals(document.getString("estado"))) pending++;
-            }
-            if (pending == 0) {
+            QuerySnapshot keysSnapshot = Tasks.await(
+                FirebaseFirestore.getInstance().collection("llaves").get());
+            int pendingPeople = countPendingPeople(peopleSnapshot);
+            int pendingKeys = countPendingKeys(keysSnapshot);
+            if (pendingPeople == 0 && pendingKeys == 0) {
                 cancelNotification();
                 return Result.success();
             }
-            showNotification(pending);
+            showNotification(getApplicationContext(), pendingPeople, pendingKeys);
             return Result.success();
         } catch (Exception ignored) {
             return Result.retry();
         }
     }
 
-    private void showNotification(int pending) {
-        Context context = getApplicationContext();
+    static boolean showTestNotification(Context context) {
         if (Build.VERSION.SDK_INT >= 33
             && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED) return;
+                != PackageManager.PERMISSION_GRANTED) return false;
         createChannel(context);
         Intent intent = new Intent(context, AccessActivity.class)
             .putExtra(AccessActivity.EXTRA_OPEN_INSIDE_FILTER, true)
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent pendingIntent = PendingIntent.getActivity(context, TEST_NOTIFICATION_ID, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        NotificationCompat.Builder notification = new NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.notification_title))
+            .setContentText(context.getString(R.string.notification_test_content))
+            .setStyle(new NotificationCompat.BigTextStyle()
+                .bigText(context.getString(R.string.notification_test_big_text)))
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT);
+        NotificationManagerCompat.from(context).notify(TEST_NOTIFICATION_ID, notification.build());
+        return true;
+    }
+
+    private static void showNotification(Context context, int pendingPeople, int pendingKeys) {
+        if (Build.VERSION.SDK_INT >= 33
+            && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) return;
+        createChannel(context);
+        Intent intent = new Intent(context,
+            pendingPeople > 0 ? AccessActivity.class : KeysActivity.class)
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        if (pendingPeople > 0) intent.putExtra(AccessActivity.EXTRA_OPEN_INSIDE_FILTER, true);
         PendingIntent pendingIntent = PendingIntent.getActivity(context, NOTIFICATION_ID, intent,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        String content = pending == 1
-            ? context.getString(R.string.notification_content_one)
-            : context.getString(R.string.notification_content_many, pending);
-        String bigText = pending == 1
-            ? context.getString(R.string.notification_big_text_one)
-            : context.getString(R.string.notification_big_text_many, pending);
+        String content = reminderContent(context, pendingPeople, pendingKeys);
+        String bigText = context.getString(R.string.notification_with_review, content);
         NotificationCompat.Builder notification = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.notification_title))
@@ -85,6 +103,39 @@ public final class ReminderWorker extends Worker {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT);
         NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification.build());
+    }
+
+    private static String reminderContent(Context context, int pendingPeople, int pendingKeys) {
+        if (pendingPeople > 0 && pendingKeys > 0) {
+            return context.getString(R.string.notification_content_both, pendingPeople, pendingKeys);
+        }
+        if (pendingPeople > 0) {
+            return pendingPeople == 1
+                ? context.getString(R.string.notification_content_people_one)
+                : context.getString(R.string.notification_content_people_many, pendingPeople);
+        }
+        return pendingKeys == 1
+            ? context.getString(R.string.notification_content_keys_one)
+            : context.getString(R.string.notification_content_keys_many, pendingKeys);
+    }
+
+    private static int countPendingPeople(QuerySnapshot snapshot) {
+        int pending = 0;
+        for (DocumentSnapshot document : snapshot.getDocuments()) {
+            if (Boolean.TRUE.equals(document.getBoolean("retirado"))) continue;
+            if (Boolean.FALSE.equals(document.getBoolean("activo"))) continue;
+            if ("Dentro".equals(document.getString("estado"))) pending++;
+        }
+        return pending;
+    }
+
+    private static int countPendingKeys(QuerySnapshot snapshot) {
+        int pending = 0;
+        for (DocumentSnapshot document : snapshot.getDocuments()) {
+            if (Boolean.FALSE.equals(document.getBoolean("activo"))) continue;
+            if ("Prestada".equals(document.getString("estado"))) pending++;
+        }
+        return pending;
     }
 
     private void cancelNotification() {

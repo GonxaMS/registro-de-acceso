@@ -14,6 +14,7 @@ public final class SetupActivity extends AppCompatActivity {
 
     @Override public void onCreate(Bundle state) {
         ThemeMode.apply(this);
+        AccessibilityMode.apply(this);
         super.onCreate(state);
         preferences = getSharedPreferences(AccessActivity.PREFS_NAME, MODE_PRIVATE);
         if (!currentUser().isEmpty()) {
@@ -22,6 +23,7 @@ public final class SetupActivity extends AppCompatActivity {
         }
 
         setContentView(R.layout.activity_user_setup);
+        AccessibilityMode.applyTo(this, findViewById(android.R.id.content));
         View root = findViewById(R.id.setupRoot);
         root.setOnApplyWindowInsetsListener((view, insets) -> {
             int horizontal = dp(24);

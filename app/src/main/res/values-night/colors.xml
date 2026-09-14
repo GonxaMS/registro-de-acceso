@@ -27,4 +27,6 @@
     <color name="gear_background">#2B3D56</color>
     <color name="gear_background_pressed">#3A5272</color>
     <color name="icon">#9FC2FF</color>
+    <color name="high_contrast_text">#FFFFFF</color>
+    <color name="high_contrast_muted">#FFFFFF</color>
 </resources>

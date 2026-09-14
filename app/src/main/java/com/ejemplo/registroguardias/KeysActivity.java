@@ -84,9 +84,11 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
 
     @Override public void onCreate(Bundle state) {
         ThemeMode.apply(this);
+        AccessibilityMode.apply(this);
         super.onCreate(state);
         preferences = getSharedPreferences(AccessActivity.PREFS_NAME, MODE_PRIVATE);
         setContentView(R.layout.activity_keys);
+        AccessibilityMode.applyTo(this, findViewById(android.R.id.content));
         applyWindowInsets();
 
         search = findViewById(R.id.inputKeySearch);

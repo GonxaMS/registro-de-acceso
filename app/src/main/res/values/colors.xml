@@ -30,4 +30,6 @@
     <color name="gear_background">#EEF4FF</color>
     <color name="gear_background_pressed">#DCE9FF</color>
     <color name="icon">#2459C4</color>
+    <color name="high_contrast_text">#000000</color>
+    <color name="high_contrast_muted">#263238</color>
 </resources>

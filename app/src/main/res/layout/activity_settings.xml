@@ -45,16 +45,30 @@
             android:textColor="@color/muted"
             android:textSize="13sp"
             android:textStyle="bold" />
-        <Button
-            android:id="@+id/btnSettingsAppearance"
+        <LinearLayout
+            android:id="@+id/settingsThemeOptions"
             android:layout_width="match_parent"
-            android:layout_height="54dp"
+            android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:background="@drawable/input"
-            android:gravity="start|center_vertical"
-            android:textAllCaps="false"
-            android:textColor="@color/text"
-            android:textSize="16sp" />
+            android:background="@drawable/filter_group"
+            android:orientation="horizontal"
+            android:padding="3dp">
+            <TextView
+                android:id="@+id/btnSettingsThemeAuto"
+                style="@style/SettingsThemeOption"
+                android:drawableTop="@drawable/ic_theme_auto"
+                android:text="@string/appearance_short_automatic" />
+            <TextView
+                android:id="@+id/btnSettingsThemeLight"
+                style="@style/SettingsThemeOption"
+                android:drawableTop="@drawable/ic_theme_light"
+                android:text="@string/appearance_short_light" />
+            <TextView
+                android:id="@+id/btnSettingsThemeDark"
+                style="@style/SettingsThemeOption"
+                android:drawableTop="@drawable/ic_theme_dark"
+                android:text="@string/appearance_short_dark" />
+        </LinearLayout>
 
         <TextView
             android:layout_width="wrap_content"
@@ -84,13 +98,13 @@
             android:textSize="13sp"
             android:textStyle="bold" />
         <Button
-            android:id="@+id/btnSettingsUser"
+            android:id="@+id/btnSettingsLogout"
             android:layout_width="match_parent"
             android:layout_height="54dp"
             android:layout_marginTop="8dp"
             android:background="@drawable/input"
             android:gravity="start|center_vertical"
-            android:text="@string/settings_change_user"
+            android:text="@string/settings_logout"
             android:textAllCaps="false"
             android:textColor="@color/text"
             android:textSize="16sp" />
@@ -109,6 +123,37 @@
             android:layout_height="54dp"
             android:layout_marginTop="4dp"
             android:text="@string/settings_vibration"
+            android:textColor="@color/text"
+            android:textSize="16sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:text="@string/settings_section_accessibility"
+            android:textColor="@color/muted"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/switchSettingsLargeText"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="4dp"
+            android:text="@string/settings_large_text"
+            android:textColor="@color/text"
+            android:textSize="16sp" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_large_text_description"
+            android:textColor="@color/muted"
+            android:textSize="14sp" />
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/switchSettingsHighContrast"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="4dp"
+            android:text="@string/settings_high_contrast"
             android:textColor="@color/text"
             android:textSize="16sp" />
 
@@ -145,6 +190,40 @@
             android:textColor="@color/text"
             android:textSize="16sp" />
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:text="@string/settings_section_application"
+            android:textColor="@color/muted"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/settingsVersionCurrent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/panel"
+            android:textColor="@color/text"
+            android:textSize="16sp" />
+        <TextView
+            android:id="@+id/settingsUpdateStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="@color/muted"
+            android:textSize="14sp" />
+        <Button
+            android:id="@+id/btnSettingsCheckUpdate"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/button_exit"
+            android:text="@string/settings_update_check"
+            android:textAllCaps="false"
+            android:textColor="@color/white"
+            android:textSize="16sp" />
+
         <Button
             android:id="@+id/btnSettingsAdmin"
             android:layout_width="match_parent"
@@ -157,25 +236,35 @@
             android:textColor="@color/text"
             android:textSize="16sp"
             android:visibility="gone" />
-
+        <Button
+            android:id="@+id/btnSettingsNotificationTest"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/input"
+            android:gravity="start|center_vertical"
+            android:text="@string/settings_notification_test"
+            android:textAllCaps="false"
+            android:textColor="@color/text"
+            android:textSize="16sp"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/settingsNotificationTestDescription"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/settings_notification_test_description"
+            android:textColor="@color/muted"
+            android:textSize="14sp"
+            android:visibility="gone" />
         <TextView
             android:id="@+id/settingsAdminInfo"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="22dp"
+            android:layout_marginTop="16dp"
             android:background="@drawable/panel"
             android:textColor="@color/muted"
             android:textSize="14sp"
             android:visibility="gone" />
-        <Button
-            android:id="@+id/btnSettingsReset"
-            android:layout_width="match_parent"
-            android:layout_height="54dp"
-            android:layout_marginTop="24dp"
-            android:background="@drawable/button_exit"
-            android:text="@string/settings_reset"
-            android:textAllCaps="false"
-            android:textColor="@color/white"
-            android:textSize="16sp" />
     </LinearLayout>
 </ScrollView>

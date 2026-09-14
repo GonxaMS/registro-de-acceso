@@ -57,8 +57,10 @@ public final class AdminCorrectionsActivity extends AppCompatActivity {
 
     @Override public void onCreate(Bundle state) {
         ThemeMode.apply(this);
+        AccessibilityMode.apply(this);
         super.onCreate(state);
         setContentView(R.layout.activity_admin_corrections);
+        AccessibilityMode.applyTo(this, findViewById(android.R.id.content));
         applyWindowInsets();
         subtitle = findViewById(R.id.txtAdminSubtitle);
         personButton = findViewById(R.id.btnAdminPerson);

@@ -49,8 +49,10 @@ public final class AdminDashboardActivity extends AppCompatActivity {
 
     @Override public void onCreate(Bundle state) {
         ThemeMode.apply(this);
+        AccessibilityMode.apply(this);
         super.onCreate(state);
         setContentView(R.layout.activity_admin_dashboard);
+        AccessibilityMode.applyTo(this, findViewById(android.R.id.content));
         applyWindowInsets();
 
         syncStatus = findViewById(R.id.txtDashboardSyncStatus);

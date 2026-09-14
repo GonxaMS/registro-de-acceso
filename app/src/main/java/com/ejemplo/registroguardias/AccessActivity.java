@@ -88,6 +88,7 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
 
     @Override public void onCreate(Bundle state) {
         ThemeMode.apply(this);
+        AccessibilityMode.apply(this);
         super.onCreate(state);
         preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         if (currentUser().isEmpty()) {
@@ -107,6 +108,7 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
         }
 
         setContentView(R.layout.activity_main);
+        AccessibilityMode.applyTo(this, findViewById(android.R.id.content));
         applyWindowInsets();
         search = findViewById(R.id.inputSearch);
         count = findViewById(R.id.txtCount);

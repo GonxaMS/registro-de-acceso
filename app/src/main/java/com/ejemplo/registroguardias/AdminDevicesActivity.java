@@ -36,8 +36,10 @@ public final class AdminDevicesActivity extends AppCompatActivity {
 
     @Override public void onCreate(Bundle state) {
         ThemeMode.apply(this);
+        AccessibilityMode.apply(this);
         super.onCreate(state);
         setContentView(R.layout.activity_admin_devices);
+        AccessibilityMode.applyTo(this, findViewById(android.R.id.content));
         applyWindowInsets();
         container = findViewById(R.id.adminDevicesContainer);
         status = findViewById(R.id.txtAdminDevicesStatus);

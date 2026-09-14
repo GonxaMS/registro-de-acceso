@@ -9,8 +9,10 @@ import androidx.appcompat.app.AppCompatActivity;
 public final class BlockedActivity extends AppCompatActivity {
     @Override public void onCreate(Bundle state) {
         ThemeMode.apply(this);
+        AccessibilityMode.apply(this);
         super.onCreate(state);
         setContentView(R.layout.activity_blocked);
+        AccessibilityMode.applyTo(this, findViewById(android.R.id.content));
         View root = findViewById(R.id.blockedRoot);
         root.setOnApplyWindowInsetsListener((view, insets) -> {
             view.setPadding(dp(24), insets.getSystemWindowInsetTop(), dp(24),

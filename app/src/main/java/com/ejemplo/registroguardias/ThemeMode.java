@@ -16,11 +16,23 @@ final class ThemeMode {
     private ThemeMode() {}
 
     static void apply(Context context) {
-        AppCompatDelegate.setDefaultNightMode(toNightMode(saved(context)));
+        AppCompatDelegate.setDefaultNightMode(toNightMode(savedMode(context)));
     }
 
     static String menuLabel(Context context) {
-        return context.getString(R.string.appearance_menu_label, label(context, saved(context)));
+        return context.getString(R.string.appearance_menu_label, label(context, savedMode(context)));
+    }
+
+    static int savedMode(Context context) {
+        SharedPreferences preferences = AppPreferences.get(context);
+        int mode = preferences.getInt(KEY, AUTOMATIC);
+        return mode < AUTOMATIC || mode > DARK ? AUTOMATIC : mode;
+    }
+
+    static void setMode(Context context, int mode) {
+        if (mode < AUTOMATIC || mode > DARK) mode = AUTOMATIC;
+        AppPreferences.get(context).edit().putInt(KEY, mode).apply();
+        AppCompatDelegate.setDefaultNightMode(toNightMode(mode));
     }
 
     static void showChooser(Activity activity) {
@@ -31,19 +43,12 @@ final class ThemeMode {
         };
         new android.app.AlertDialog.Builder(activity)
             .setTitle(R.string.appearance_title)
-            .setSingleChoiceItems(options, saved(activity), (dialog, which) -> {
-                AppPreferences.get(activity).edit().putInt(KEY, which).apply();
+            .setSingleChoiceItems(options, savedMode(activity), (dialog, which) -> {
                 dialog.dismiss();
-                AppCompatDelegate.setDefaultNightMode(toNightMode(which));
+                setMode(activity, which);
             })
             .setNegativeButton(R.string.dialog_cancel, null)
             .show();
-    }
-
-    private static int saved(Context context) {
-        SharedPreferences preferences = AppPreferences.get(context);
-        int mode = preferences.getInt(KEY, AUTOMATIC);
-        return mode < AUTOMATIC || mode > DARK ? AUTOMATIC : mode;
     }
 
     private static int toNightMode(int mode) {

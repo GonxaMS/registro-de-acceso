@@ -5,43 +5,64 @@ import android.app.AlertDialog;
 import android.app.TimePickerDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.view.View;
-import android.widget.EditText;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SwitchCompat;
+import androidx.core.content.FileProvider;
 
 import com.google.firebase.firestore.FirebaseFirestore;
 
-import java.util.Locale;
+import java.io.File;
 
 public final class SettingsActivity extends AppCompatActivity {
     private static final int NOTIFICATION_PERMISSION_REQUEST = 4101;
+    private static final int TEST_NOTIFICATION_PERMISSION_REQUEST = 4102;
 
     private SwitchCompat remindersSwitch;
     private SwitchCompat vibrationSwitch;
+    private SwitchCompat largeTextSwitch;
+    private SwitchCompat highContrastSwitch;
     private TextView reminderTime;
     private TextView startScreen;
-    private TextView appearance;
+    private TextView themeAutomatic;
+    private TextView themeLight;
+    private TextView themeDark;
+    private TextView updateStatus;
+    private Button updateButton;
     private View adminButton;
+    private View notificationTestButton;
+    private View notificationTestDescription;
+    private UpdateManager.UpdateInfo updateInfo;
+    private boolean updateInProgress;
 
     @Override public void onCreate(Bundle state) {
         ThemeMode.apply(this);
+        AccessibilityMode.apply(this);
         super.onCreate(state);
         setContentView(R.layout.activity_settings);
+        AccessibilityMode.applyTo(this, findViewById(android.R.id.content));
         applyWindowInsets();
 
         findViewById(R.id.btnSettingsBack).setOnClickListener(view -> finish());
-        appearance = findViewById(R.id.btnSettingsAppearance);
-        appearance.setOnClickListener(view -> ThemeMode.showChooser(this));
+        themeAutomatic = findViewById(R.id.btnSettingsThemeAuto);
+        themeLight = findViewById(R.id.btnSettingsThemeLight);
+        themeDark = findViewById(R.id.btnSettingsThemeDark);
+        themeAutomatic.setOnClickListener(view -> selectTheme(ThemeMode.AUTOMATIC));
+        themeLight.setOnClickListener(view -> selectTheme(ThemeMode.LIGHT));
+        themeDark.setOnClickListener(view -> selectTheme(ThemeMode.DARK));
+
         startScreen = findViewById(R.id.btnSettingsStartScreen);
         startScreen.setOnClickListener(view -> chooseStartScreen());
-        findViewById(R.id.btnSettingsUser).setOnClickListener(view -> chooseUserName());
+        findViewById(R.id.btnSettingsLogout).setOnClickListener(view -> confirmLogout());
+
         remindersSwitch = findViewById(R.id.switchSettingsReminders);
         remindersSwitch.setChecked(AppPreferences.remindersEnabled(this));
         remindersSwitch.setOnCheckedChangeListener((button, checked) -> setRemindersEnabled(checked));
@@ -50,12 +71,36 @@ public final class SettingsActivity extends AppCompatActivity {
         vibrationSwitch.setOnCheckedChangeListener((button, checked) ->
             AppPreferences.get(this).edit()
                 .putBoolean(AppPreferences.VIBRATION_ENABLED_KEY, checked).apply());
+
+        largeTextSwitch = findViewById(R.id.switchSettingsLargeText);
+        largeTextSwitch.setChecked(AppPreferences.largeTextEnabled(this));
+        largeTextSwitch.setOnCheckedChangeListener((button, checked) -> {
+            AppPreferences.get(this).edit()
+                .putBoolean(AppPreferences.LARGE_TEXT_KEY, checked).apply();
+            recreate();
+        });
+        highContrastSwitch = findViewById(R.id.switchSettingsHighContrast);
+        highContrastSwitch.setChecked(AppPreferences.highContrastEnabled(this));
+        highContrastSwitch.setOnCheckedChangeListener((button, checked) -> {
+            AppPreferences.get(this).edit()
+                .putBoolean(AppPreferences.HIGH_CONTRAST_KEY, checked).apply();
+            recreate();
+        });
+
         reminderTime = findViewById(R.id.btnSettingsReminderTime);
         reminderTime.setOnClickListener(view -> chooseReminderTime());
+
+        updateStatus = findViewById(R.id.settingsUpdateStatus);
+        updateButton = findViewById(R.id.btnSettingsCheckUpdate);
+        updateButton.setOnClickListener(view -> checkOrDownloadUpdate());
+
         adminButton = findViewById(R.id.btnSettingsAdmin);
         adminButton.setOnClickListener(view ->
             startActivity(new Intent(this, AdminDashboardActivity.class)));
-        findViewById(R.id.btnSettingsReset).setOnClickListener(view -> confirmReset());
+        notificationTestButton = findViewById(R.id.btnSettingsNotificationTest);
+        notificationTestDescription = findViewById(R.id.settingsNotificationTestDescription);
+        notificationTestButton.setOnClickListener(view -> sendTestNotification());
+
         render();
         loadAdminInfo();
 
@@ -78,7 +123,10 @@ public final class SettingsActivity extends AppCompatActivity {
     }
 
     private void render() {
-        appearance.setText(ThemeMode.menuLabel(this));
+        int mode = ThemeMode.savedMode(this);
+        themeAutomatic.setSelected(mode == ThemeMode.AUTOMATIC);
+        themeLight.setSelected(mode == ThemeMode.LIGHT);
+        themeDark.setSelected(mode == ThemeMode.DARK);
         boolean keys = AppPreferences.START_KEYS.equals(
             AppPreferences.get(this).getString(AppPreferences.START_SCREEN_KEY,
                 AppPreferences.START_PERSONAL));
@@ -86,6 +134,15 @@ public final class SettingsActivity extends AppCompatActivity {
             getString(keys ? R.string.settings_start_keys : R.string.settings_start_personal)));
         reminderTime.setText(getString(R.string.settings_reminder_time,
             AppPreferences.reminderHour(this), AppPreferences.reminderMinute(this)));
+        TextView version = findViewById(R.id.settingsVersionCurrent);
+        version.setText(getString(R.string.settings_version_current, BuildConfig.VERSION_NAME));
+        updateStatus.setText("");
+        updateButton.setText(R.string.settings_update_check);
+    }
+
+    private void selectTheme(int mode) {
+        ThemeMode.setMode(this, mode);
+        render();
     }
 
     private void setRemindersEnabled(boolean enabled) {
@@ -131,61 +188,18 @@ public final class SettingsActivity extends AppCompatActivity {
             .show();
     }
 
-    private void chooseUserName() {
-        EditText input = new EditText(this);
-        input.setHint(R.string.settings_user_name_hint);
-        input.setSingleLine(true);
-        input.setSelectAllOnFocus(true);
-        input.setText(AppPreferences.get(this).getString(AccessActivity.USER_NAME_KEY, ""));
-        int horizontalPadding = (int) (20 * getResources().getDisplayMetrics().density + 0.5f);
-        input.setPadding(horizontalPadding, input.getPaddingTop(),
-            horizontalPadding, input.getPaddingBottom());
-        AlertDialog dialog = new AlertDialog.Builder(this)
-            .setTitle(R.string.settings_change_user_title)
-            .setMessage(R.string.settings_change_user_message)
-            .setView(input)
-            .setNegativeButton(R.string.settings_cancel, null)
-            .setPositiveButton(R.string.settings_save, null)
-            .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            .setOnClickListener(view -> {
-                String name = cleanName(input.getText().toString());
-                if (name.length() < 2) {
-                    input.setError(getString(R.string.setup_user_error));
-                    return;
-                }
-                AppPreferences.get(this).edit()
-                    .putString(AccessActivity.USER_NAME_KEY, name).apply();
-                dialog.dismiss();
-                Toast.makeText(this, getString(R.string.settings_user_changed, name),
-                    Toast.LENGTH_SHORT).show();
-            }));
-        dialog.show();
-    }
-
-    private static String cleanName(String value) {
-        return value.trim().replaceAll("\\s+", " ");
-    }
-
-    private void confirmReset() {
+    private void confirmLogout() {
         new AlertDialog.Builder(this)
-            .setTitle(R.string.settings_reset_title)
-            .setMessage(R.string.settings_reset_message)
+            .setTitle(R.string.settings_logout_title)
+            .setMessage(R.string.settings_logout_message)
             .setNegativeButton(R.string.settings_cancel, null)
-            .setPositiveButton(R.string.settings_reset, (dialog, which) -> {
+            .setPositiveButton(R.string.settings_logout, (dialog, which) -> {
                 AppPreferences.get(this).edit()
-                    .remove(AppPreferences.START_SCREEN_KEY)
-                    .remove(AppPreferences.REMINDERS_ENABLED_KEY)
-                    .remove(AppPreferences.REMINDER_HOUR_KEY)
-                    .remove(AppPreferences.REMINDER_MINUTE_KEY)
-                    .remove(AppPreferences.VIBRATION_ENABLED_KEY)
-                    .apply();
-                ThemeMode.reset(this);
-                ReminderScheduler.reschedule(this);
-                render();
-                remindersSwitch.setChecked(AppPreferences.remindersEnabled(this));
-                vibrationSwitch.setChecked(AppPreferences.vibrationEnabled(this));
-                Toast.makeText(this, R.string.settings_restored, Toast.LENGTH_SHORT).show();
+                    .remove(AccessActivity.USER_NAME_KEY).apply();
+                Intent intent = new Intent(this, SetupActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                startActivity(intent);
+                finish();
             })
             .show();
     }
@@ -195,17 +209,122 @@ public final class SettingsActivity extends AppCompatActivity {
         AdminAccess.checkRole(FirebaseFirestore.getInstance(), (allowed, role) -> {
             if (isFinishing() || !AdminAccess.ADMIN.equals(role)) return;
             adminButton.setVisibility(View.VISIBLE);
+            notificationTestButton.setVisibility(View.VISIBLE);
+            notificationTestDescription.setVisibility(View.VISIBLE);
             info.setVisibility(View.VISIBLE);
             info.setText(getString(R.string.settings_technical_info, BuildConfig.VERSION_NAME,
                 BuildConfig.VERSION_CODE, getPackageName()));
         });
     }
 
+    private void sendTestNotification() {
+        if (Build.VERSION.SDK_INT >= 33
+            && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                TEST_NOTIFICATION_PERMISSION_REQUEST);
+            return;
+        }
+        if (ReminderWorker.showTestNotification(this)) {
+            Toast.makeText(this, R.string.settings_notification_test_sent,
+                Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void checkOrDownloadUpdate() {
+        if (updateInProgress) return;
+        if (updateInfo != null && updateInfo.isUpdateAvailable()) {
+            downloadUpdate();
+            return;
+        }
+        updateInProgress = true;
+        updateButton.setEnabled(false);
+        updateStatus.setText(R.string.settings_update_checking);
+        UpdateManager.check(this, new UpdateManager.CheckCallback() {
+            @Override public void onComplete(UpdateManager.UpdateInfo info) {
+                if (isFinishing()) return;
+                updateInProgress = false;
+                updateButton.setEnabled(true);
+                if (info.isUpdateAvailable()) {
+                    updateInfo = info;
+                    updateStatus.setText(getString(R.string.settings_update_available,
+                        info.latestVersion));
+                    updateButton.setText(R.string.settings_update_button);
+                } else {
+                    updateInfo = null;
+                    updateStatus.setText(R.string.settings_update_up_to_date);
+                    updateButton.setText(R.string.settings_update_check);
+                }
+            }
+
+            @Override public void onError(Exception error) {
+                if (isFinishing()) return;
+                updateInProgress = false;
+                updateButton.setEnabled(true);
+                updateInfo = null;
+                updateStatus.setText(R.string.settings_update_failed);
+                updateButton.setText(R.string.settings_update_check);
+            }
+        });
+    }
+
+    private void downloadUpdate() {
+        UpdateManager.UpdateInfo info = updateInfo;
+        if (info == null) return;
+        updateInProgress = true;
+        updateButton.setEnabled(false);
+        updateStatus.setText(getString(R.string.settings_update_downloading,
+            info.latestVersion));
+        UpdateManager.download(this, info, new UpdateManager.DownloadCallback() {
+            @Override public void onProgress(int percent) {
+                // El estado mantiene el texto simple y solo muestra la versión destino.
+            }
+
+            @Override public void onComplete(File apkFile) {
+                if (isFinishing()) return;
+                updateInProgress = false;
+                updateButton.setEnabled(true);
+                installApk(apkFile);
+            }
+
+            @Override public void onError(Exception error) {
+                if (isFinishing()) return;
+                updateInProgress = false;
+                updateButton.setEnabled(true);
+                updateStatus.setText(R.string.settings_update_download_failed);
+            }
+        });
+    }
+
+    private void installApk(File apkFile) {
+        if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+            Intent permissionIntent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                Uri.parse("package:" + getPackageName()));
+            startActivity(permissionIntent);
+            updateStatus.setText(R.string.settings_update_install_permission);
+            return;
+        }
+        Uri apkUri = FileProvider.getUriForFile(this,
+            BuildConfig.APPLICATION_ID + ".fileprovider", apkFile);
+        Intent installIntent = new Intent(Intent.ACTION_VIEW)
+            .setDataAndType(apkUri, "application/vnd.android.package-archive")
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(installIntent);
+    }
+
     @Override public void onRequestPermissionsResult(int requestCode, String[] permissions,
                                                        int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        boolean granted = grantResults.length > 0
+            && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+        if (requestCode == TEST_NOTIFICATION_PERMISSION_REQUEST) {
+            if (granted) sendTestNotification();
+            else Toast.makeText(this, R.string.settings_notifications_disabled,
+                Toast.LENGTH_LONG).show();
+            return;
+        }
         if (requestCode != NOTIFICATION_PERMISSION_REQUEST) return;
-        if (grantResults.length == 0 || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
+        if (!granted) {
             remindersSwitch.setChecked(false);
             AppPreferences.get(this).edit()
                 .putBoolean(AppPreferences.REMINDERS_ENABLED_KEY, false).apply();
