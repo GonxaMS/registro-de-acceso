@@ -20,6 +20,8 @@
     <color name="filter_unselected">#25364D</color>
     <color name="filter_selected_text">#08152C</color>
     <color name="filter_unselected_text">#DCE9FF</color>
+    <color name="filter_group_background">#1A2635</color>
+    <color name="filter_pressed">#2F455F</color>
     <color name="highlight_person">#244A3A</color>
     <color name="highlight_key">#4A3F23</color>
     <color name="gear_background">#2B3D56</color>
