@@ -24,7 +24,6 @@ import java.io.File;
 
 public final class SettingsActivity extends AppCompatActivity {
     private static final int NOTIFICATION_PERMISSION_REQUEST = 4101;
-    private static final int TEST_NOTIFICATION_PERMISSION_REQUEST = 4102;
 
     private SwitchCompat remindersSwitch;
     private SwitchCompat vibrationSwitch;
@@ -38,8 +37,6 @@ public final class SettingsActivity extends AppCompatActivity {
     private TextView updateStatus;
     private Button updateButton;
     private View adminButton;
-    private View notificationTestButton;
-    private View notificationTestDescription;
     private UpdateManager.UpdateInfo updateInfo;
     private boolean updateInProgress;
 
@@ -97,9 +94,6 @@ public final class SettingsActivity extends AppCompatActivity {
         adminButton = findViewById(R.id.btnSettingsAdmin);
         adminButton.setOnClickListener(view ->
             startActivity(new Intent(this, AdminDashboardActivity.class)));
-        notificationTestButton = findViewById(R.id.btnSettingsNotificationTest);
-        notificationTestDescription = findViewById(R.id.settingsNotificationTestDescription);
-        notificationTestButton.setOnClickListener(view -> sendTestNotification());
 
         render();
         loadAdminInfo();
@@ -209,26 +203,10 @@ public final class SettingsActivity extends AppCompatActivity {
         AdminAccess.checkRole(FirebaseFirestore.getInstance(), (allowed, role) -> {
             if (isFinishing() || !AdminAccess.ADMIN.equals(role)) return;
             adminButton.setVisibility(View.VISIBLE);
-            notificationTestButton.setVisibility(View.VISIBLE);
-            notificationTestDescription.setVisibility(View.VISIBLE);
             info.setVisibility(View.VISIBLE);
             info.setText(getString(R.string.settings_technical_info, BuildConfig.VERSION_NAME,
                 BuildConfig.VERSION_CODE, getPackageName()));
         });
-    }
-
-    private void sendTestNotification() {
-        if (Build.VERSION.SDK_INT >= 33
-            && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},
-                TEST_NOTIFICATION_PERMISSION_REQUEST);
-            return;
-        }
-        if (ReminderWorker.showTestNotification(this)) {
-            Toast.makeText(this, R.string.settings_notification_test_sent,
-                Toast.LENGTH_SHORT).show();
-        }
     }
 
     private void checkOrDownloadUpdate() {
@@ -317,12 +295,6 @@ public final class SettingsActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         boolean granted = grantResults.length > 0
             && grantResults[0] == PackageManager.PERMISSION_GRANTED;
-        if (requestCode == TEST_NOTIFICATION_PERMISSION_REQUEST) {
-            if (granted) sendTestNotification();
-            else Toast.makeText(this, R.string.settings_notifications_disabled,
-                Toast.LENGTH_LONG).show();
-            return;
-        }
         if (requestCode != NOTIFICATION_PERMISSION_REQUEST) return;
         if (!granted) {
             remindersSwitch.setChecked(false);

@@ -52,6 +52,7 @@
     <string name="settings_notification_test">Probar notificaciones</string>
     <string name="settings_notification_test_description">Env&#237;a un aviso de prueba para comprobar que el tel&#233;fono puede mostrar recordatorios.</string>
     <string name="settings_notification_test_sent">Notificaci&#243;n de prueba enviada</string>
+    <string name="admin_notifications_section">NOTIFICACIONES</string>
     <string name="settings_technical_info">Informaci&#243;n t&#233;cnica
 Versi&#243;n %1$s &#183; c&#243;digo %2$d
 Paquete %3$s</string>

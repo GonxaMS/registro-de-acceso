@@ -236,27 +236,6 @@
             android:textColor="@color/text"
             android:textSize="16sp"
             android:visibility="gone" />
-        <Button
-            android:id="@+id/btnSettingsNotificationTest"
-            android:layout_width="match_parent"
-            android:layout_height="54dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/input"
-            android:gravity="start|center_vertical"
-            android:text="@string/settings_notification_test"
-            android:textAllCaps="false"
-            android:textColor="@color/text"
-            android:textSize="16sp"
-            android:visibility="gone" />
-        <TextView
-            android:id="@+id/settingsNotificationTestDescription"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/settings_notification_test_description"
-            android:textColor="@color/muted"
-            android:textSize="14sp"
-            android:visibility="gone" />
         <TextView
             android:id="@+id/settingsAdminInfo"
             android:layout_width="match_parent"

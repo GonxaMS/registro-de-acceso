@@ -1,8 +1,11 @@
 package com.ejemplo.registroguardias;
 
+import android.Manifest;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -30,6 +33,7 @@ import java.util.Map;
 
 public final class AdminDashboardActivity extends AppCompatActivity {
     private static final String ADMIN_USER = "Admin";
+    private static final int TEST_NOTIFICATION_PERMISSION_REQUEST = 4201;
     private static final Locale LOCALE = new Locale("es", "AR");
 
     private final List<DocumentSnapshot> synchronizationFailures = new ArrayList<>();
@@ -60,6 +64,8 @@ public final class AdminDashboardActivity extends AppCompatActivity {
         monthButton = findViewById(R.id.btnDashboardMonth);
         rebuildButton = findViewById(R.id.btnDashboardRebuildSheets);
         resolveErrorsButton = findViewById(R.id.btnDashboardResolveErrors);
+        View notificationSection = findViewById(R.id.dashboardNotificationSection);
+        Button notificationTestButton = findViewById(R.id.btnDashboardNotificationTest);
         selectedMonth = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
         updateMonthLabel();
 
@@ -73,6 +79,7 @@ public final class AdminDashboardActivity extends AppCompatActivity {
         monthButton.setOnClickListener(view -> chooseMonth());
         rebuildButton.setOnClickListener(view -> confirmRebuildSheets());
         resolveErrorsButton.setOnClickListener(view -> confirmResolveErrors());
+        notificationTestButton.setOnClickListener(view -> sendTestNotification());
 
         database = FirebaseFirestore.getInstance();
         AdminAccess.check(database, (allowed, uid) -> {
@@ -82,9 +89,24 @@ public final class AdminDashboardActivity extends AppCompatActivity {
                 finish();
                 return;
             }
+            notificationSection.setVisibility(View.VISIBLE);
             listenForSynchronization();
             listenForRebuildRequest();
         });
+    }
+
+    private void sendTestNotification() {
+        if (Build.VERSION.SDK_INT >= 33
+            && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                TEST_NOTIFICATION_PERMISSION_REQUEST);
+            return;
+        }
+        if (ReminderWorker.showTestNotification(this)) {
+            Toast.makeText(this, R.string.settings_notification_test_sent,
+                Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void applyWindowInsets() {
@@ -297,6 +319,19 @@ public final class AdminDashboardActivity extends AppCompatActivity {
 
     private void toast(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                                                       int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != TEST_NOTIFICATION_PERMISSION_REQUEST) return;
+        if (grantResults.length > 0
+            && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            sendTestNotification();
+        } else {
+            Toast.makeText(this, R.string.settings_notifications_disabled,
+                Toast.LENGTH_LONG).show();
+        }
     }
 
     @Override protected void onResume() {
