@@ -160,6 +160,8 @@ Paquete %3$s</string>
     <string name="borrowed_keys_count">Llaves prestadas: %1$d</string>
     <string name="people_summary_one">1 operario &#183; %1$d dentro</string>
     <string name="people_summary_many">%1$d operarios &#183; %2$d dentro</string>
+    <string name="people_summary_compact_one">1 total &#183; %1$d dentro</string>
+    <string name="people_summary_compact_many">%1$d total &#183; %2$d dentro</string>
     <string name="keys_summary_one">1 llave &#183; %1$d prestadas</string>
     <string name="keys_summary_many">%1$d llaves &#183; %2$d prestadas</string>
     <string name="sheet_unavailable">La planilla no est&#225; disponible</string>

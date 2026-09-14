@@ -243,8 +243,8 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
         int inside = 0;
         for (Person person : filteredPeople) if ("Dentro".equals(person.state)) inside++;
         count.setText(filteredPeople.size() == 1
-            ? getString(R.string.people_summary_one, inside)
-            : getString(R.string.people_summary_many, filteredPeople.size(), inside));
+            ? getString(R.string.people_summary_compact_one, inside)
+            : getString(R.string.people_summary_compact_many, filteredPeople.size(), inside));
         adapter.notifyDataSetChanged();
     }
 
