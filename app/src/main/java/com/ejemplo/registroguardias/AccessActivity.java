@@ -105,7 +105,7 @@ public final class AccessActivity extends AppCompatActivity implements PeopleAda
         adapter.setToday(today());
         ((ListView) findViewById(R.id.listPeople)).setAdapter(adapter);
         ((TextView) findViewById(R.id.txtToday)).setText(
-            new SimpleDateFormat(getString(R.string.date_format_full), new Locale("es", "AR"))
+            new SimpleDateFormat(getString(R.string.date_format_compact), new Locale("es", "AR"))
                 .format(new Date())
         );
         findViewById(R.id.btnMenu).setOnClickListener(this::showMainMenu);
