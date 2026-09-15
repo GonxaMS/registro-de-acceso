@@ -9,6 +9,9 @@ const COLECCION_COMANDOS_ADMIN = "comandosAdmin";
 const DOCUMENTO_REHACER_PLANILLAS = "rehacerPlanillas";
 const ULTIMO_PERSONAL_FIREBASE = "FIREBASE_ULTIMO_PERSONAL";
 const ULTIMO_LLAVES_FIREBASE = "FIREBASE_ULTIMO_LLAVES";
+const ULTIMO_CONTADOR_PERSONAL_FIREBASE = "FIREBASE_ULTIMO_CONTADOR_PERSONAL";
+const ULTIMO_CONTADOR_LLAVES_FIREBASE = "FIREBASE_ULTIMO_CONTADOR_LLAVES";
+const ULTIMO_CONTADOR_REHACER_FIREBASE = "FIREBASE_ULTIMO_CONTADOR_REHACER";
 const TAMANO_LOTE_FIREBASE = 500;
 
 function configurarSincronizacionFirebase(projectId, apiKey) {
@@ -34,7 +37,7 @@ function obtenerUidServicioFirebase() {
 }
 
 /**
- * Instala un único disparador por minuto y ejecuta la recuperación inicial.
+ * Instala un único disparador cada 10 minutos y ejecuta la recuperación inicial.
  * Requiere FIREBASE_PROJECT_ID y FIREBASE_API_KEY en las propiedades del script.
  */
 function instalarSincronizacionFirebase() {
@@ -289,7 +292,13 @@ function reiniciarVistaLlaves(config, fechaMes) {
  */
 function sincronizarDesdeFirebase() {
   const resultado = sincronizarDatosDesdeFirebase();
-  const reconstruccion = procesarSolicitudRehacerPlanillas();
+  const reconstruccion = procesarSolicitudRehacerPlanillas(resultado.debeConsultarRehacer);
+  if (resultado.marcadorRehacer !== undefined) {
+    PropertiesService.getScriptProperties().setProperty(
+      ULTIMO_CONTADOR_REHACER_FIREBASE, resultado.marcadorRehacer);
+  }
+  delete resultado.debeConsultarRehacer;
+  delete resultado.marcadorRehacer;
   if (reconstruccion) resultado.reconstruccion = reconstruccion;
   return resultado;
 }
@@ -307,26 +316,47 @@ function sincronizarDatosDesdeFirebase() {
     const config = obtenerConfiguracion();
     firebase = obtenerConfiguracionFirebase();
     token = obtenerTokenFirebase(firebase);
+    const contadores = leerDocumentoFirestore(firebase, token, "meta", "config") || {};
+    const contadorPersonal = texto(contadores.siguienteMovimiento);
+    const contadorLlaves = texto(contadores.siguienteMovimientoLlave);
+    const marcadorRehacer = texto(contadores.solicitudRehacerPlanillas) || "0";
+    const contadorPersonalAnterior = texto(
+      firebase.propiedades.getProperty(ULTIMO_CONTADOR_PERSONAL_FIREBASE));
+    const contadorLlavesAnterior = texto(
+      firebase.propiedades.getProperty(ULTIMO_CONTADOR_LLAVES_FIREBASE));
+    const marcadorRehacerAnterior = texto(
+      firebase.propiedades.getProperty(ULTIMO_CONTADOR_REHACER_FIREBASE));
+    const hayCambiosPersonal = !contadorPersonalAnterior
+      || contadorPersonal !== contadorPersonalAnterior;
+    const hayCambiosLlaves = !contadorLlavesAnterior
+      || contadorLlaves !== contadorLlavesAnterior;
+    const debeConsultarRehacer = !marcadorRehacerAnterior
+      || marcadorRehacer !== marcadorRehacerAnterior;
     const resultado = {
-      personal: sincronizarColeccionFirestore(
+      personal: hayCambiosPersonal ? sincronizarColeccionFirestore(
         firebase, token, "movimientos", ULTIMO_PERSONAL_FIREBASE,
-        documentos => sincronizarMovimientosPersonales(documentos, config)),
-      llaves: sincronizarColeccionFirestore(
+        documentos => sincronizarMovimientosPersonales(documentos, config)) : 0,
+      llaves: hayCambiosLlaves ? sincronizarColeccionFirestore(
         firebase, token, "movimientosLlaves", ULTIMO_LLAVES_FIREBASE,
-        documentos => sincronizarMovimientosLlaves(documentos, config))
+        documentos => sincronizarMovimientosLlaves(documentos, config)) : 0
     };
+    resultado.debeConsultarRehacer = debeConsultarRehacer;
+    resultado.marcadorRehacer = marcadorRehacer;
+    if (hayCambiosPersonal) {
+      firebase.propiedades.setProperty(ULTIMO_CONTADOR_PERSONAL_FIREBASE, contadorPersonal);
+    }
+    if (hayCambiosLlaves) {
+      firebase.propiedades.setProperty(ULTIMO_CONTADOR_LLAVES_FIREBASE, contadorLlaves);
+    }
     SpreadsheetApp.flush();
-    guardarEstadoSincronizacion(firebase, token, {
-      estado: "Correcto",
-      ultimaEjecucion: new Date(),
-      ultimoError: "",
-      copiadosPersonal: resultado.personal,
-      copiadosLlaves: resultado.llaves
-    });
-    try {
-      resolverErroresSincronizacion(firebase, token);
-    } catch (errorResolucion) {
-      console.warn("No se pudieron resolver fallos anteriores: " + mensajeError(errorResolucion));
+    if (hayCambiosPersonal || hayCambiosLlaves) {
+      guardarEstadoSincronizacion(firebase, token, {
+        estado: "Correcto",
+        ultimaEjecucion: new Date(),
+        ultimoError: "",
+        copiadosPersonal: resultado.personal,
+        copiadosLlaves: resultado.llaves
+      });
     }
     console.log(JSON.stringify(resultado));
     return resultado;
@@ -352,7 +382,8 @@ function sincronizarDatosDesdeFirebase() {
   }
 }
 
-function procesarSolicitudRehacerPlanillas() {
+function procesarSolicitudRehacerPlanillas(debeConsultar) {
+  if (!debeConsultar) return null;
   const firebase = obtenerConfiguracionFirebase();
   const token = obtenerTokenFirebase(firebase);
   const solicitud = leerDocumentoFirestore(

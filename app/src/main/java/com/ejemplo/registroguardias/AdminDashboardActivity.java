@@ -20,6 +20,7 @@ import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.firestore.WriteBatch;
 
 import java.text.SimpleDateFormat;
@@ -293,7 +294,12 @@ public final class AdminDashboardActivity extends AppCompatActivity {
         request.put("fechaMes", selectedMonth);
         request.put("solicitadoPor", ADMIN_USER);
         request.put("solicitado", FieldValue.serverTimestamp());
-        database.collection("comandosAdmin").document("rehacerPlanillas").set(request)
+        Map<String, Object> marker = new HashMap<>();
+        marker.put("solicitudRehacerPlanillas", FieldValue.increment(1));
+        WriteBatch batch = database.batch();
+        batch.set(database.collection("comandosAdmin").document("rehacerPlanillas"), request);
+        batch.set(database.collection("meta").document("config"), marker, SetOptions.merge());
+        batch.commit()
             .addOnSuccessListener(ignored -> toast(getString(R.string.admin_request_sent)))
             .addOnFailureListener(error -> showMessage(getString(R.string.admin_request_failed),
                 friendlyError(error)));

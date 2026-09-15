@@ -86,7 +86,7 @@ if (!source.includes("leerColeccionCompletaFirestore(firebase, token, \"movimien
   throw new Error("La reconstrucción debe leer Personal y Llaves directamente desde Firebase");
 }
 if (!source.includes(".everyMinutes(1)")) {
-  throw new Error("La sincronización de Firebase debe ejecutarse cada minuto");
+  throw new Error("La sincronización de Firebase debe ejecutarse cada 10 minutos");
 }
 if (!source.includes("erroresSincronizacion")) {
   throw new Error("Los fallos de sincronización deben quedar registrados");

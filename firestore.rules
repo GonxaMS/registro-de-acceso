@@ -517,10 +517,11 @@ service cloud.firestore {
     }
 
     match /meta/{id} {
-      allow read: if hasAccess() && id == 'config';
+      allow read: if (hasAccess() || isService()) && id == 'config';
       allow create, update: if hasAccess() && id == 'config'
         && request.resource.data.keys().hasOnly([
-          'siguienteId','siguienteMovimiento','siguienteLlave','siguienteMovimientoLlave'
+          'siguienteId','siguienteMovimiento','siguienteLlave','siguienteMovimientoLlave',
+          'solicitudRehacerPlanillas'
         ])
         && (!request.resource.data.keys().hasAny(['siguienteId'])
           || request.resource.data.siguienteId is int)
@@ -529,7 +530,9 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAny(['siguienteLlave'])
           || request.resource.data.siguienteLlave is int)
         && (!request.resource.data.keys().hasAny(['siguienteMovimientoLlave'])
-          || request.resource.data.siguienteMovimientoLlave is int);
+          || request.resource.data.siguienteMovimientoLlave is int)
+        && (!request.resource.data.keys().hasAny(['solicitudRehacerPlanillas'])
+          || request.resource.data.solicitudRehacerPlanillas is int);
       allow delete: if false;
     }
   }
