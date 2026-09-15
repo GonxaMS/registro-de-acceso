@@ -81,7 +81,6 @@ Paquete %3$s</string>
     <string name="appearance_short_dark">Oscuro</string>
     <string name="menu_add_person">Agregar operario</string>
     <string name="menu_show_hidden_people">Mostrar operarios ocultos</string>
-    <string name="menu_person_options">Opciones del operario</string>
     <string name="menu_modify_time">Modificar hora</string>
     <string name="menu_cancel_entry">Quitar ingreso de hoy</string>
     <string name="menu_cancel_exit">Quitar salida de hoy</string>
@@ -89,7 +88,6 @@ Paquete %3$s</string>
     <string name="menu_hide_person">Ocultar operario</string>
     <string name="menu_add_key">Agregar llave</string>
     <string name="menu_show_hidden_keys">Mostrar llaves ocultas</string>
-    <string name="menu_key_options">Opciones de la llave</string>
     <string name="menu_cancel_key_take">Quitar retiro de hoy</string>
     <string name="menu_cancel_key_return">Quitar devoluci&#243;n de hoy</string>
     <string name="menu_hide_key">Ocultar llave</string>
@@ -105,10 +103,6 @@ Paquete %3$s</string>
     <string name="notification_with_review">%1$s. Toca para revisar.</string>
     <string name="notification_test_content">Prueba de notificaciones</string>
     <string name="notification_test_big_text">Las notificaciones están funcionando correctamente. Toca para abrir la aplicación.</string>
-    <string name="notification_content_one">Hay 1 persona dentro sin salida registrada</string>
-    <string name="notification_content_many">Hay %1$d personas dentro sin salida registrada</string>
-    <string name="notification_big_text_one">Hay 1 persona dentro sin salida registrada. Toca para revisar.</string>
-    <string name="notification_big_text_many">Hay %1$d personas dentro sin salida registrada. Toca para revisar.</string>
     <string name="back_symbol">‹</string>
     <string name="more_options_symbol">⋮</string>
     <string name="sheet_icon">📊</string>
@@ -164,10 +158,8 @@ Paquete %3$s</string>
     <string name="dialog_cancel">Cancelar</string>
     <string name="dialog_save">Guardar</string>
     <string name="dialog_add">Agregar</string>
-    <string name="dialog_remove">Quitar</string>
     <string name="dialog_close">Cerrar</string>
     <string name="dialog_retry">Reintentar</string>
-    <string name="error_no_connection_title">Sin conexi&#243;n</string>
     <string name="error_no_connection_retry">No hay conexi&#243;n. Intenta nuevamente.</string>
     <string name="error_no_permission">No tienes permiso para realizar esta acci&#243;n.</string>
     <string name="error_operation_failed">No se pudo completar la operaci&#243;n. Intenta nuevamente.</string>
@@ -180,13 +172,9 @@ Paquete %3$s</string>
     <string name="error_hide_failed">No se pudo ocultar</string>
     <string name="error_read_schedules">No se pudieron leer los horarios</string>
     <string name="error_modify_failed">No se pudo modificar la hora</string>
-    <string name="error_save_failed">No se pudo guardar</string>
     <string name="loading_people">Cargando operarios&#8230;</string>
     <string name="loading_keys">Cargando llaves&#8230;</string>
-    <string name="borrowed_keys_unavailable">Llaves prestadas: --</string>
     <string name="borrowed_keys_count">Llaves prestadas: %1$d</string>
-    <string name="people_summary_one">1 operario &#183; %1$d dentro</string>
-    <string name="people_summary_many">%1$d operarios &#183; %2$d dentro</string>
     <string name="people_summary_compact_one">1 total &#183; %1$d dentro</string>
     <string name="people_summary_compact_many">%1$d total &#183; %2$d dentro</string>
     <string name="keys_summary_one">1 llave &#183; %1$d prestadas</string>
@@ -251,21 +239,15 @@ Paquete %3$s</string>
     <string name="key_person_title_return">Quien devuelve %1$s</string>
     <string name="key_person_message">Elige de la lista o escribe APELLIDO primero y NOMBRE despu&#233;s.</string>
     <string name="key_written_name_button">Usar nombre escrito</string>
-    <string name="key_name_hint">APELLIDO NOMBRE (ej. P&#201;REZ JUAN)</string>
     <string name="key_name_error">Escribe apellido y nombre</string>
     <string name="key_name_order_error">Escribe APELLIDO primero y NOMBRE despu&#233;s</string>
     <string name="key_name_too_long">El nombre es demasiado largo</string>
     <string name="registering_withdrawal">Registrando retiro&#8230;</string>
     <string name="registering_return">Registrando devoluci&#243;n&#8230;</string>
-    <string name="key_movement_registered">%1$s %2$s a las %3$s</string>
     <string name="add_key_title">Agregar llave</string>
     <string name="key_name_or_id_hint">Nombre o identificaci&#243;n de la llave</string>
     <string name="key_already_exists">Esta llave ya existe</string>
-    <string name="key_returned_to_list">%1$s volvi&#243; a la lista</string>
-    <string name="key_added">%1$s fue agregada</string>
-    <string name="key_cannot_hide">Primero deben devolver %1$s</string>
     <string name="hide_key_title">Ocultar llave</string>
-    <string name="hide_key_message">Quieres ocultar %1$s de la lista?</string>
     <string name="key_hidden">Llave oculta</string>
     <string name="no_hidden_keys">No hay llaves ocultas</string>
     <string name="show_hidden_keys_title">Mostrar llaves ocultas</string>
@@ -284,9 +266,7 @@ Paquete %3$s</string>
     <string name="date_format_short_timestamp">dd/MM HH:mm</string>
     <string name="key_load_title">Llaves</string>
     <string name="key_load_failed">No se pudieron cargar las llaves</string>
-    <string name="people_for_keys_title">Personal para llaves</string>
     <string name="people_for_keys_failed">No se pudo cargar el personal</string>
-    <string name="key_workers_title">Operarios de llaves</string>
     <string name="key_workers_failed">No se pudieron cargar los operarios de llaves</string>
     <string name="key_person_name_hint">APELLIDO NOMBRE (ej. PÉREZ JUAN)</string>
     <string name="key_name_required">Escribe un nombre</string>
@@ -334,7 +314,6 @@ UID: %1$s</string>
     <string name="admin_device_count_one">1 dispositivo registrado</string>
     <string name="admin_device_count_many">%1$d dispositivos registrados</string>
     <string name="admin_device_no_name">Dispositivo sin nombre</string>
-    <string name="admin_this_phone">ESTE TELÉFONO</string>
     <string name="admin_self_permission">Tu permiso no se modifica desde aquí</string>
     <string name="admin_change_permission">Cambiar permiso</string>
     <string name="admin_remove_device">Eliminar dispositivo</string>
@@ -397,9 +376,6 @@ Si ese teléfono todavía está en uso, deberá registrarse y autorizarse nuevam
     <string name="admin_request_failed">No se pudo solicitar</string>
     <string name="admin_sync_state">%1$s
 %2$s</string>
-    <string name="admin_sync_state_with_error">%1$s
-%2$s
-%3$s</string>
     <string name="admin_errors_log_date">%1$s · %2$s
 %3$s</string>
     <string name="admin_corrections_loading">Cargando operarios…</string>
@@ -437,7 +413,6 @@ Si ese teléfono todavía está en uso, deberá registrarse y autorizarse nuevam
     <string name="admin_remove_entry_blocked">No se puede quitar el ingreso</string>
     <string name="admin_remove_entry_message">Primero debes quitar la salida de ese día, porque depende del ingreso.</string>
     <string name="admin_remove_movement_detail">Quitar el %1$s de %2$s del %3$s a las %4$s. El movimiento original conservará su ID y quedará anulado por un nuevo movimiento.</string>
-    <string name="admin_remove_action">Quitar</string>
     <string name="admin_remove_title">Quitar %1$s</string>
     <string name="admin_remove_correction_progress">Quitando %1$s…</string>
     <string name="admin_remove_movement_success">%1$s del %2$s fue quitado</string>
@@ -468,5 +443,4 @@ Si ese teléfono todavía está en uso, deberá registrarse y autorizarse nuevam
     <string name="admin_key_remove_detail">Quitar %1$s de %2$s del %3$s · ID %4$s?</string>
     <string name="admin_key_removed">Movimiento quitado correctamente</string>
     <string name="admin_old_data_visible">Los datos anteriores seguirán visibles.</string>
-    <string name="app_error_without_detail">Error sin detalle</string>
 </resources>

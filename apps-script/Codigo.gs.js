@@ -604,32 +604,6 @@ function guardarErrorSincronizacion(config, token, mensaje) {
   });
 }
 
-function resolverErroresSincronizacion(config, token) {
-  const pendientes = leerColeccionCompletaFirestore(
-    config, token, COLECCION_ERRORES_SINCRONIZACION)
-    .filter(documento => documento.resuelto !== true);
-  pendientes.forEach(documento => marcarErrorResueltoFirestore(config, token, documento.id));
-  return pendientes.length;
-}
-
-function marcarErrorResueltoFirestore(config, token, id) {
-  const url = "https://firestore.googleapis.com/v1/projects/"
-    + encodeURIComponent(config.projectId)
-    + "/databases/(default)/documents/" + COLECCION_ERRORES_SINCRONIZACION
-    + "/" + encodeURIComponent(id) + "?updateMask.fieldPaths=resuelto";
-  const respuesta = UrlFetchApp.fetch(url, {
-    method: "patch",
-    contentType: "application/json",
-    headers: {Authorization: "Bearer " + token},
-    payload: JSON.stringify({fields: {resuelto: {booleanValue: true}}}),
-    muteHttpExceptions: true
-  });
-  if (respuesta.getResponseCode() >= 400) {
-    throw new Error("Firestore resolver error " + respuesta.getResponseCode()
-      + ": " + respuesta.getContentText());
-  }
-}
-
 function escribirDocumentoFirestore(config, token, coleccion, id, datos) {
   const fields = {};
   Object.keys(datos).forEach(clave => {

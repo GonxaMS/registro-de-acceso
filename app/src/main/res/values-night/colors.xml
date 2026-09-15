@@ -17,7 +17,6 @@
     <color name="disabled_stroke">#475364</color>
     <color name="disabled_text">#9BA7B6</color>
     <color name="filter_selected">#4F8DFF</color>
-    <color name="filter_unselected">#25364D</color>
     <color name="filter_selected_text">#08152C</color>
     <color name="filter_unselected_text">#DCE9FF</color>
     <color name="filter_group_background">#1A2635</color>
