@@ -29,7 +29,9 @@ Hechos inmutables `L000001`. Cada movimiento guarda:
 
 ### `meta/config`
 
-Mantiene contadores separados para operarios, movimientos de acceso, llaves y movimientos de llaves.
+Mantiene contadores separados para operarios, movimientos de acceso, llaves y movimientos de llaves,
+además de `solicitudRehacerPlanillas`, un entero que aumenta cuando un administrador solicita rehacer
+las planillas. Apps Script usa estos valores como control liviano antes de leer las colecciones.
 
 ### `administradores`, `dispositivos` y `servicios`
 
@@ -63,7 +65,13 @@ No se versionan `google-services.json`, `local.properties`, URLs privadas ni IDs
 Script obtiene la configuración de Firebase y `ID_PLANILLA` desde sus propiedades privadas.
 ## Sincronización de Sheets
 
-Android no envía solicitudes a Sheets. Apps Script consulta Firestore cada minuto y usa las hojas técnicas ocultas para omitir IDs ya procesados. Los fallos se guardan en erroresSincronizacion y el último estado en sincronizacion/sheets; la pantalla de Admin muestra ambos.
+Android no envía solicitudes a Sheets. Apps Script consulta `meta/config` cada minuto. Si no cambian
+`siguienteMovimiento`, `siguienteMovimientoLlave` ni `solicitudRehacerPlanillas`, no lee colecciones
+de movimientos ni el documento de comandos. Cuando cambia un contador, consulta únicamente la
+colección correspondiente y usa las hojas técnicas ocultas para omitir IDs ya procesados. Cuando
+cambia el marcador, consulta `comandosAdmin/rehacerPlanillas` y reconstruye solo si está Pendiente.
+Los fallos se guardan en `erroresSincronizacion` y el último estado en `sincronizacion/sheets`;
+la pantalla de Admin muestra ambos.
 
 Apps Script requiere FIREBASE_PROJECT_ID y FIREBASE_API_KEY en sus propiedades privadas. El token anónimo renovable se conserva como FIREBASE_REFRESH_TOKEN.
 Si ese token deja de poder renovarse, el sincronizador informa el error y conserva el UID esperado;

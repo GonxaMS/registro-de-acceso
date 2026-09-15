@@ -98,6 +98,7 @@ async function seed() {
         siguienteMovimiento: 1,
         siguienteLlave: 3,
         siguienteMovimientoLlave: 1,
+        solicitudRehacerPlanillas: 0,
       }),
     ]);
   });
@@ -278,11 +279,17 @@ function networkDbAs(uid) {
   return networkEnvironment.authenticatedContext(uid).firestore();
 }
 
+function firestoreEmulatorPort() {
+  const endpoint = process.env.FIRESTORE_EMULATOR_HOST || "127.0.0.1:8080";
+  const port = Number(endpoint.split(":").pop());
+  return Number.isInteger(port) && port > 0 ? port : 8080;
+}
+
 async function run() {
   environment = await initializeTestEnvironment({projectId, firestore: {rules}});
   await environment.clearFirestore();
   await seed();
-  networkProxy = await createNetworkProxy(8080);
+  networkProxy = await createNetworkProxy(firestoreEmulatorPort());
   networkEnvironment = await initializeTestEnvironment({
     projectId,
     firestore: {host: "127.0.0.1", port: 8181},

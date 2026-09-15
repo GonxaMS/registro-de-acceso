@@ -7,7 +7,7 @@
 | Android | Interfaz de operarios, accesos y préstamos de llaves. |
 | Firebase Authentication | Sesión anónima interna; el usuario visible es un nombre configurado en la app. |
 | Cloud Firestore | Fuente principal de operarios, llaves, movimientos y contadores. |
-| Apps Script | Consulta Firestore cada minuto y actualiza la copia secundaria. |
+| Apps Script | Consulta `meta/config` cada minuto y solo actualiza la copia secundaria si hay cambios. |
 | Google Sheets | Vista operativa de Personal y pestañas mensuales de registros y llaves. |
 
 ## Código Android
@@ -35,7 +35,10 @@ consultarla.
 3. La transacción crea un documento correlativo `L000001`, actualiza la llave y avanza el contador.
 4. Las reglas verifican que el movimiento, la llave y el operario coincidan dentro de esa misma operación.
 5. Cuando Firebase confirma, la operación queda finalizada para Android.
-6. Cada minuto Apps Script consulta Firestore, compara los IDs con las hojas técnicas y copia únicamente los pendientes.
-7. El estado y los errores quedan disponibles para la pantalla de Admin.
+6. Cada minuto Apps Script consulta únicamente `meta/config`, que contiene contadores de movimientos
+   y un marcador para solicitudes manuales.
+7. Solo si cambió un contador consulta la colección correspondiente y copia los movimientos pendientes.
+8. Solo si cambió el marcador consulta `comandosAdmin/rehacerPlanillas` y ejecuta la reconstrucción solicitada.
+9. El estado y los errores quedan disponibles para la pantalla de Admin.
 
 Firestore siempre es la fuente de verdad. Un error de Sheets no revierte el movimiento: el siguiente ciclo vuelve a encontrar el ID pendiente y lo reintenta.

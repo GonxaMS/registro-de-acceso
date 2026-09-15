@@ -30,6 +30,7 @@ Put-Document "meta/config" @{
     siguienteMovimiento = Int-Field 1
     siguienteLlave = Int-Field 3
     siguienteMovimientoLlave = Int-Field 1
+    solicitudRehacerPlanillas = Int-Field 0
 }
 
 if ($AdminUid) {

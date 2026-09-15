@@ -3,7 +3,7 @@
 ## Requisitos
 
 - Android Studio o Android SDK.
-- JDK 21 para el entorno actual.
+- JDK 17 o superior para Gradle (GitHub Actions usa JDK 21).
 - Node.js 22 para las pruebas de Firestore y Google Sheets.
 - Android 7.0 (API 24) o posterior en el dispositivo.
 - `google-services.json` y `local.properties` privados.
@@ -25,7 +25,8 @@ de movimientos; creación y ocultamiento de llaves; préstamos atómicos; admini
 dispositivos; y el contrato de pestañas mensuales de Google Sheets. También reproduce ingresos,
 salidas, retiros y devoluciones completos, y enfrenta dos dispositivos simultáneos para comprobar
 que solo una operación pueda modificar a la misma persona o llave. Gradle valida la normalización de
-estados y datos que muestra Android.
+estados y datos que muestra Android. El contrato de Apps Script también simula el sondeo de
+`meta/config` y comprueba que no se lean las colecciones de movimientos si sus contadores no cambiaron.
 
 Las pruebas de integración también interrumpen realmente el canal local hacia Firestore antes y
 durante una confirmación. Comprueban que no haya éxito anticipado, escrituras parciales ni duplicados,
@@ -87,6 +88,6 @@ Nunca modificar el `package_name` dentro de `google-services.json` para simular 
 
 - `versionCode` aumenta en cada APK distribuida.
 - `versionName` usa `mayor.menor.parche`.
-- La versión actual documentada es `3.9.23` (`versionCode 53`).
+- La versión actual documentada es `3.10.7` (`versionCode 61`).
 - Los APK entregados usan el nombre `RegistroAcceso-vX.Y.Z.apk`.
 - Las compilaciones de entrega se firman con la clave estable del proyecto desde GitHub Actions.

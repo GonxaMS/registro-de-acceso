@@ -14,6 +14,7 @@ Aplicación Android privada para registrar ingresos, salidas y préstamos de lla
 - Opción de escribir `APELLIDO NOMBRE`; se convierte a mayúsculas y queda disponible en una lista exclusiva de llaves, sin agregarse a Personal.
 - Historial inmutable y correlativo para movimientos de operarios y llaves.
 - Copia automática, persistente e idempotente a pestañas mensuales de Google Sheets, con reintentos al recuperar la conexión.
+- Sincronización de Apps Script cada minuto con lectura de control liviana: solo consulta movimientos cuando cambian sus contadores.
 - Permisos remotos `Administrativo`, `Normal` y `Bloqueado` por UID de Firebase.
 - Registro en Admin de errores de la app que persisten después de reintentar.
 - Panel administrativo unificado con accesos rápidos, estado de Sheets y reconstrucción mensual.

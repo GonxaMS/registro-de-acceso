@@ -5,7 +5,9 @@ const vm = require("vm");
 const root = path.resolve(__dirname, "..");
 const scriptPath = path.join(root, "apps-script", "Codigo.gs.js");
 const source = fs.readFileSync(scriptPath, "utf8");
-const context = {};
+const context = {
+  console: {log() {}, warn() {}, error() {}}
+};
 vm.createContext(context);
 vm.runInContext(source, context, {filename: scriptPath});
 
@@ -86,7 +88,7 @@ if (!source.includes("leerColeccionCompletaFirestore(firebase, token, \"movimien
   throw new Error("La reconstrucción debe leer Personal y Llaves directamente desde Firebase");
 }
 if (!source.includes(".everyMinutes(1)")) {
-  throw new Error("La sincronización de Firebase debe ejecutarse cada 10 minutos");
+  throw new Error("La sincronización de Firebase debe ejecutarse cada minuto");
 }
 if (!source.includes("erroresSincronizacion")) {
   throw new Error("Los fallos de sincronización deben quedar registrados");
@@ -97,5 +99,117 @@ if (!source.includes("insertColumnsBefore(columna, 2)")) {
 if (!source.includes("insertColumnsBefore(columna, 4)")) {
   throw new Error("Llaves debe insertar fechas atrasadas en orden cronológico");
 }
+
+function crearPropiedadesPrueba(iniciales) {
+  const valores = Object.assign({}, iniciales);
+  return {
+    getProperty(clave) {
+      return Object.prototype.hasOwnProperty.call(valores, clave) ? valores[clave] : null;
+    },
+    setProperty(clave, valor) {
+      valores[clave] = String(valor);
+    },
+    valor(clave) {
+      return valores[clave];
+    }
+  };
+}
+
+function sondearSincronizacion(contadores, iniciales, ejecutarRehacer) {
+  const propiedades = crearPropiedadesPrueba(iniciales);
+  const lecturasDocumentos = [];
+  const lecturasColecciones = [];
+  const solicitudesRehacer = [];
+  context.PropertiesService = {getScriptProperties: () => propiedades};
+  context.LockService = {
+    getScriptLock: () => ({tryLock: () => true, releaseLock() {}})
+  };
+  context.SpreadsheetApp = {flush() {}};
+  context.obtenerConfiguracion = () => ({planillaId: "planilla-prueba"});
+  context.obtenerConfiguracionFirebase = () => ({
+    projectId: "proyecto-prueba",
+    apiKey: "clave-prueba",
+    propiedades: propiedades
+  });
+  context.obtenerTokenFirebase = () => "token-prueba";
+  context.leerDocumentoFirestore = (_firebase, _token, coleccion, id) => {
+    lecturasDocumentos.push({coleccion, id});
+    return contadores;
+  };
+  context.sincronizarColeccionFirestore = (_firebase, _token, coleccion) => {
+    lecturasColecciones.push(coleccion);
+    return 0;
+  };
+  context.guardarEstadoSincronizacion = () => {};
+  context.procesarSolicitudRehacerPlanillas = debeConsultar => {
+    solicitudesRehacer.push(debeConsultar);
+    return null;
+  };
+
+  const resultado = ejecutarRehacer
+    ? context.sincronizarDesdeFirebase()
+    : context.sincronizarDatosDesdeFirebase();
+  return {resultado, lecturasDocumentos, lecturasColecciones, solicitudesRehacer, propiedades};
+}
+
+const estadoEstable = sondearSincronizacion({
+  siguienteMovimiento: 11,
+  siguienteMovimientoLlave: 7,
+  solicitudRehacerPlanillas: 3
+}, {
+  FIREBASE_ULTIMO_CONTADOR_PERSONAL: "11",
+  FIREBASE_ULTIMO_CONTADOR_LLAVES: "7",
+  FIREBASE_ULTIMO_CONTADOR_REHACER: "3"
+}, true);
+assertEqual(estadoEstable.lecturasDocumentos.length, 1,
+  "Con estado estable solo se consulta meta/config");
+assertEqual(estadoEstable.lecturasDocumentos[0].coleccion, "meta",
+  "La consulta de control debe leer meta/config");
+assertEqual(estadoEstable.lecturasColecciones.length, 0,
+  "Con estado estable no se leen movimientos");
+assertEqual(estadoEstable.solicitudesRehacer[0], false,
+  "Con marcador estable no se consulta el comando");
+
+const personalNuevo = sondearSincronizacion({
+  siguienteMovimiento: 12,
+  siguienteMovimientoLlave: 7,
+  solicitudRehacerPlanillas: 3
+}, {
+  FIREBASE_ULTIMO_CONTADOR_PERSONAL: "11",
+  FIREBASE_ULTIMO_CONTADOR_LLAVES: "7",
+  FIREBASE_ULTIMO_CONTADOR_REHACER: "3"
+}, false);
+assertEqual(personalNuevo.lecturasColecciones.join(","), "movimientos",
+  "Un contador personal nuevo debe leer solo movimientos");
+assertEqual(personalNuevo.propiedades.valor("FIREBASE_ULTIMO_CONTADOR_PERSONAL"), "12",
+  "El contador personal leído debe quedar asentado");
+
+const llavesNuevas = sondearSincronizacion({
+  siguienteMovimiento: 12,
+  siguienteMovimientoLlave: 8,
+  solicitudRehacerPlanillas: 3
+}, {
+  FIREBASE_ULTIMO_CONTADOR_PERSONAL: "12",
+  FIREBASE_ULTIMO_CONTADOR_LLAVES: "7",
+  FIREBASE_ULTIMO_CONTADOR_REHACER: "3"
+}, false);
+assertEqual(llavesNuevas.lecturasColecciones.join(","), "movimientosLlaves",
+  "Un contador de llaves nuevo debe leer solo movimientosLlaves");
+
+const rehacerNuevo = sondearSincronizacion({
+  siguienteMovimiento: 12,
+  siguienteMovimientoLlave: 8,
+  solicitudRehacerPlanillas: 4
+}, {
+  FIREBASE_ULTIMO_CONTADOR_PERSONAL: "12",
+  FIREBASE_ULTIMO_CONTADOR_LLAVES: "8",
+  FIREBASE_ULTIMO_CONTADOR_REHACER: "3"
+}, true);
+assertEqual(rehacerNuevo.lecturasColecciones.length, 0,
+  "Un comando nuevo no debe leer movimientos durante el sondeo");
+assertEqual(rehacerNuevo.solicitudesRehacer[0], true,
+  "Un marcador nuevo debe habilitar la consulta del comando");
+assertEqual(rehacerNuevo.propiedades.valor("FIREBASE_ULTIMO_CONTADOR_REHACER"), "4",
+  "El marcador de rehacer debe quedar asentado");
 
 console.log("Contrato mensual de Google Sheets: OK");

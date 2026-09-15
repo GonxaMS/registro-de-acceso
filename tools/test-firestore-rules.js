@@ -10,6 +10,7 @@ const {
   doc,
   getDoc,
   getDocs,
+  increment,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -41,6 +42,12 @@ async function test(name, action) {
     failed += 1;
     console.error(`FALLO  ${name}`);
     console.error(error && error.message ? error.message : error);
+  }
+}
+
+function assertEqual(actual, expected, label) {
+  if (actual !== expected) {
+    throw new Error(`${label}: se esperaba ${expected}, se obtuvo ${actual}`);
   }
 }
 
@@ -115,6 +122,7 @@ async function seed() {
         siguienteMovimiento: 1,
         siguienteLlave: 2,
         siguienteMovimientoLlave: 1,
+        solicitudRehacerPlanillas: 0,
       }),
     ]);
   });
@@ -269,6 +277,24 @@ async function run() {
   await test("los contadores no son visibles para bloqueados", async () => {
     await assertSucceeds(getDoc(doc(dbAs(USERS.admin), "meta", "config")));
     await assertFails(getDoc(doc(dbAs(USERS.blocked), "meta", "config")));
+  });
+  await test("un administrador puede avanzar el marcador de rehacer planillas", async () => {
+    const db = dbAs(USERS.admin);
+    await assertSucceeds(updateDoc(doc(db, "meta", "config"), {
+      solicitudRehacerPlanillas: increment(1),
+    }));
+    assertEqual((await getDoc(doc(db, "meta", "config"))).data().solicitudRehacerPlanillas,
+      1, "Marcador de rehacer");
+  });
+  await test("el servicio no puede modificar el marcador de rehacer planillas", async () => {
+    await assertFails(updateDoc(doc(dbAs(USERS.service), "meta", "config"), {
+      solicitudRehacerPlanillas: increment(1),
+    }));
+  });
+  await test("el marcador de rehacer debe ser un entero", async () => {
+    await assertFails(updateDoc(doc(dbAs(USERS.admin), "meta", "config"), {
+      solicitudRehacerPlanillas: "1",
+    }));
   });
   await test("un administrador puede eliminar otro dispositivo y su permiso", async () => {
     await assertSucceeds(setDoc(doc(dbAs(USERS.admin), "administradores", USERS.normal), {

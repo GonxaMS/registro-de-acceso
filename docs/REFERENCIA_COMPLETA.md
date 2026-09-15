@@ -1,6 +1,6 @@
 # Referencia completa y estado del proyecto
 
-Documento actualizado para la versión 3.9.23. Describe el comportamiento vigente, las decisiones
+Documento actualizado para la versión 3.10.7. Describe el comportamiento vigente, las decisiones
 aceptadas y los riesgos pendientes. Firebase es la fuente de verdad; Google Sheets es una copia
 operativa secundaria.
 
@@ -56,7 +56,8 @@ registro en `personal`.
 
 - Authentication usa sesiones anónimas para identificar cada instalación mediante UID.
 - Firestore contiene estados actuales, movimientos inmutables, roles, contadores y errores.
-- `meta/config` mantiene los siguientes IDs de operarios, movimientos y llaves.
+- `meta/config` mantiene los siguientes IDs de operarios, movimientos y llaves, además del marcador
+  `solicitudRehacerPlanillas` para activar reconstrucciones manuales.
 - Las reglas validan autenticación, rol, estructura, referencias y transacciones.
 - Un movimiento creado no puede actualizarse ni eliminarse.
 
@@ -64,8 +65,9 @@ Las colecciones y campos se detallan en [Datos y seguridad](DATOS_Y_SEGURIDAD.md
 
 ## Google Sheets y Apps Script
 
-Android no llama a Apps Script ni mantiene una cola secundaria. Apps Script consulta Firestore
-periódicamente, reconstruye las pestañas mensuales y evita duplicados por `movimientoId`.
+Android no llama a Apps Script ni mantiene una cola secundaria. Apps Script consulta `meta/config`
+cada minuto; solo lee la colección cuyo contador cambió, reconstruye las pestañas mensuales cuando
+se solicita y evita duplicados por `movimientoId`.
 
 - Personal: `Registro Personal AÑO-M`.
 - Llaves: `Registro Llaves AÑO-M`.
@@ -105,9 +107,8 @@ Comprobaciones actuales:
 firebase deploy --only firestore:rules --dry-run --project registro-guardias-408cb
 ```
 
-La compilación ejecuta análisis Android, pero todavía no existen casos de prueba Java activos. Las
-reglas deben validarse localmente antes de publicarse y nunca se debe probar contra producción con
-datos ficticios.
+La compilación ejecuta análisis Android y casos unitarios Java. Las reglas deben validarse localmente
+antes de publicarse y nunca se debe probar contra producción con datos ficticios.
 
 ## Problemas pendientes clasificados
 
@@ -121,7 +122,7 @@ datos ficticios.
   si el permiso fue retirado, la pantalla se cierra o muestra el bloqueo correspondiente.
 - `fecha` y `hora` proceden del reloj del teléfono. `creado` usa la hora oficial del servidor como
   respaldo, pero no valida ni reemplaza los valores operativos.
-- No hay pruebas automáticas con casos reales; la validación funcional sigue siendo manual.
+- La validación con dispositivos físicos y datos operativos reales sigue siendo manual.
 - Borrar los datos o reinstalar desde cero puede producir un UID anónimo nuevo y requerir autorización.
 
 ### Baja
@@ -136,8 +137,8 @@ datos ficticios.
 - Mantener los permisos amplios del rol Normal.
 - Mantener fecha y hora operativas basadas en el teléfono.
 - No endurecer por ahora los contadores internos.
-- Posponer las pruebas automáticas.
-- Continuar auditando antes de crear una versión final firmada.
+- Mantener pruebas automáticas para contratos, reglas, integración y normalización Android.
+- Continuar auditando antes de cada versión firmada.
 
 ## Prueba manual mínima por versión
 
