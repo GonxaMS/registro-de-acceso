@@ -39,5 +39,7 @@ apps-script/.clasp.json
 ENTREGA_CODEX_REGISTRO_ACCESO_*/
 ENTREGA_CODEX_REGISTRO_ACCESO_*.zip
 ENTREGA_CODEX_REGISTRO_ACCESO_*.zip.sha256.txt
+# Temporary screenshots received during the workspace session
+.codex-remote-attachments/
 # Dependencias locales de las pruebas JavaScript
 node_modules/
