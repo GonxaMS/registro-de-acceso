@@ -1,6 +1,7 @@
 package com.ejemplo.registroguardias;
 
 import android.app.AlertDialog;
+import android.app.TimePickerDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
@@ -26,11 +27,13 @@ import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.firestore.Timestamp;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -573,12 +576,419 @@ public final class KeysActivity extends AppCompatActivity implements KeysAdapter
             return;
         }
         PopupMenu menu = new PopupMenu(this, anchor);
+        menu.getMenu().add(R.string.menu_modify_time);
+        menu.getMenu().add(R.string.menu_cancel_key_take);
+        menu.getMenu().add(R.string.menu_cancel_key_return);
         menu.getMenu().add(R.string.menu_hide_key);
         menu.setOnMenuItemClickListener(item -> {
-            confirmHide(key);
+            String option = item.getTitle().toString();
+            if (option.equals(getString(R.string.menu_modify_time))) loadTodayKeyMovements(key);
+            else if (option.equals(getString(R.string.menu_cancel_key_take))) {
+                startKeyCancellation(key, "Retiro");
+            } else if (option.equals(getString(R.string.menu_cancel_key_return))) {
+                startKeyCancellation(key, "Devolucion");
+            } else confirmHide(key);
             return true;
         });
         menu.show();
+    }
+
+    private static final class DailyKeyMovements {
+        DocumentSnapshot take;
+        DocumentSnapshot returnMovement;
+    }
+
+    private static final class KeyMovementHistory {
+        final DailyKeyMovements today = new DailyKeyMovements();
+        final List<DocumentSnapshot> effective = new ArrayList<>();
+    }
+
+    private void loadTodayKeyMovements(KeyItem key) {
+        String date = today();
+        toast(getString(R.string.key_searching_today_movements));
+        database.collection("movimientosLlaves").whereEqualTo("llaveId", key.id).get()
+            .addOnSuccessListener(snapshot -> {
+                KeyMovementHistory history = effectiveKeyMovements(snapshot.getDocuments(), date);
+                showKeyMovementChoice(key, history.today, date);
+            })
+            .addOnFailureListener(error -> showMessage(getString(R.string.error_read_schedules),
+                friendlyError(error)));
+    }
+
+    private KeyMovementHistory effectiveKeyMovements(List<DocumentSnapshot> documents, String date) {
+        KeyMovementHistory history = new KeyMovementHistory();
+        Set<String> replaced = new HashSet<>();
+        for (DocumentSnapshot document : documents) {
+            String replacement = document.getString("reemplazaA");
+            String cancellation = document.getString("anulaA");
+            if (replacement != null) replaced.add(replacement);
+            if (cancellation != null) replaced.add(cancellation);
+        }
+        for (DocumentSnapshot document : documents) {
+            if (replaced.contains(document.getId())) continue;
+            String type = document.getString("movimiento");
+            if (!"Retiro".equals(type) && !"Devolucion".equals(type)) continue;
+            history.effective.add(document);
+            if (!date.equals(document.getString("fecha"))) continue;
+            if ("Retiro".equals(type)) {
+                history.today.take = newerKeyMovement(history.today.take, document);
+            } else {
+                history.today.returnMovement = newerKeyMovement(
+                    history.today.returnMovement, document);
+            }
+        }
+        return history;
+    }
+
+    private void showKeyMovementChoice(KeyItem key, DailyKeyMovements daily, String date) {
+        if (daily.take == null && daily.returnMovement == null) {
+            showMessage(getString(R.string.key_no_schedule_to_modify),
+                getString(R.string.key_no_today_movements, key.name));
+            return;
+        }
+        if (daily.take != null && daily.returnMovement != null) {
+            String[] options = {
+                getString(R.string.key_take_time_label, shownTime(daily.take)),
+                getString(R.string.key_return_time_label, shownTime(daily.returnMovement))
+            };
+            new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.key_modify_time_title, key.name))
+                .setItems(options, (dialog, index) -> {
+                    if (index == 0) openKeyTimePicker(key, "Retiro", daily.take, daily, date);
+                    else openKeyTimePicker(key, "Devolucion", daily.returnMovement, daily, date);
+                })
+                .setNegativeButton(R.string.dialog_cancel, null)
+                .show();
+            return;
+        }
+        String type = daily.take != null ? "Retiro" : "Devolucion";
+        DocumentSnapshot movement = daily.take != null ? daily.take : daily.returnMovement;
+        openKeyTimePicker(key, type, movement, daily, date);
+    }
+
+    private void openKeyTimePicker(KeyItem key, String type, DocumentSnapshot movement,
+                                   DailyKeyMovements daily, String date) {
+        int initial = minutes(shownTime(movement));
+        if (initial < 0) {
+            Calendar now = Calendar.getInstance();
+            initial = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
+        }
+        new TimePickerDialog(this, (picker, hour, minute) -> {
+            int selected = hour * 60 + minute;
+            if ("Retiro".equals(type) && daily.returnMovement != null
+                && selected >= minutes(shownTime(daily.returnMovement))) {
+                showMessage(getString(R.string.invalid_time_title),
+                    getString(R.string.key_invalid_take_time));
+                return;
+            }
+            if ("Devolucion".equals(type) && daily.take != null
+                && selected <= minutes(shownTime(daily.take))) {
+                showMessage(getString(R.string.invalid_time_title),
+                    getString(R.string.key_invalid_return_time));
+                return;
+            }
+            String newTime = String.format(Locale.US, "%02d:%02d", hour, minute);
+            confirmKeyTimeChange(key, type, movement, date, newTime);
+        }, initial / 60, initial % 60, true).show();
+    }
+
+    private void confirmKeyTimeChange(KeyItem key, String type, DocumentSnapshot previous,
+                                      String date, String newTime) {
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.confirm_new_time)
+            .setMessage(getString(R.string.key_new_time_message, type, key.name, newTime))
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.dialog_save, (dialog, which) ->
+                saveCorrectedKeyTime(key, type, previous, date, newTime))
+            .show();
+    }
+
+    private void saveCorrectedKeyTime(KeyItem key, String type, DocumentSnapshot previous,
+                                      String date, String newTime) {
+        if (!pendingMovements.add(key.id)) return;
+        adapter.notifyDataSetChanged();
+        toast(getString(R.string.saving_correction));
+        DocumentReference keyReference = database.collection("llaves").document(key.id);
+        DocumentReference metaReference = database.collection("meta").document("config");
+        DocumentReference previousReference = database.collection("movimientosLlaves")
+            .document(previous.getId());
+        String registeredBy = currentUser();
+        database.runTransaction(transaction -> {
+            DocumentSnapshot current = transaction.get(keyReference);
+            DocumentSnapshot config = transaction.get(metaReference);
+            DocumentSnapshot previousStored = transaction.get(previousReference);
+            if (!previousStored.exists()) {
+                throw new IllegalStateException(getString(R.string.key_record_changed));
+            }
+            boolean take = "Retiro".equals(type);
+            String currentState = current.getString("estado");
+            boolean isCurrent = previous.getId().equals(current.getString("ultimoMovimientoId"));
+            if (isCurrent && ((take && !"Prestada".equals(currentState))
+                || (!take && !"Disponible".equals(currentState)))) {
+                throw new IllegalStateException(getString(R.string.key_record_changed));
+            }
+            long next = nextNumber(config, "siguienteMovimientoLlave");
+            String correctionId = String.format(Locale.US, "L%06d", next);
+            Map<String, Object> correction = new HashMap<>();
+            correction.put("movimientoId", correctionId);
+            correction.put("llaveId", key.id);
+            correction.put("llaveNombre", key.name);
+            correction.put("movimiento", type);
+            correction.put("personaId", text(previousStored.getString("personaId")));
+            correction.put("persona", text(previousStored.getString("persona")));
+            if (take) {
+                correction.put("quienRetiraId", text(previousStored.getString("quienRetiraId")));
+                correction.put("quienRetira", text(previousStored.getString("quienRetira")));
+            } else {
+                correction.put("quienDevuelveId", text(previousStored.getString("quienDevuelveId")));
+                correction.put("quienDevuelve", text(previousStored.getString("quienDevuelve")));
+            }
+            correction.put("fecha", date);
+            correction.put("hora", newTime);
+            correction.put("usuario", registeredBy);
+            correction.put("creado", FieldValue.serverTimestamp());
+            correction.put("esCorreccion", true);
+            correction.put("reemplazaA", previous.getId());
+            transaction.set(database.collection("movimientosLlaves").document(correctionId), correction);
+
+            if (isCurrent) {
+                Map<String, Object> keyUpdate = new HashMap<>();
+                keyUpdate.put("estado", take ? "Prestada" : "Disponible");
+                keyUpdate.put("quienTiene", take ? text(previousStored.getString("persona")) : "");
+                keyUpdate.put("quienTieneId", take ? text(previousStored.getString("personaId")) : "");
+                keyUpdate.put("fechaRetiro", take ? date : "");
+                keyUpdate.put("horaRetiro", take ? newTime : "");
+                keyUpdate.put("ultimoMovimiento", type);
+                keyUpdate.put("ultimoMovimientoId", correctionId);
+                keyUpdate.put("ultimaFecha", date);
+                keyUpdate.put("ultimaHora", newTime);
+                keyUpdate.put("actualizado", FieldValue.serverTimestamp());
+                transaction.update(keyReference, keyUpdate);
+            }
+            transaction.set(metaReference,
+                Collections.singletonMap("siguienteMovimientoLlave", next + 1), SetOptions.merge());
+            return correctionId;
+        }).addOnSuccessListener(correctionId -> {
+            finishKeyMovement(key.id);
+            toast(getString(R.string.key_movement_updated, type, key.name, newTime, registeredBy));
+        }).addOnFailureListener(error -> {
+            finishKeyMovement(key.id);
+            showMessage(getString(R.string.error_modify_failed), friendlyError(error));
+        });
+    }
+
+    private void startKeyCancellation(KeyItem key, String type) {
+        String date = today();
+        toast(getString(R.string.checking_today_record));
+        database.collection("movimientosLlaves").whereEqualTo("llaveId", key.id).get()
+            .addOnSuccessListener(snapshot -> {
+                KeyMovementHistory history = effectiveKeyMovements(snapshot.getDocuments(), date);
+                DocumentSnapshot target = "Retiro".equals(type)
+                    ? history.today.take : history.today.returnMovement;
+                if (target == null) {
+                    showMessage(getString(R.string.error_remove_failed),
+                        getString(R.string.key_no_movement_today,
+                            keyMovementLabel(type), key.name));
+                    return;
+                }
+                if ("Retiro".equals(type) && history.today.returnMovement != null) {
+                    showMessage(getString(R.string.key_cannot_remove_take),
+                        getString(R.string.key_remove_return_first));
+                    return;
+                }
+                String restoreType = "Retiro".equals(type) ? "Devolucion" : "Retiro";
+                DocumentSnapshot restore = previousKeyMovement(history.effective, target, restoreType);
+                if ("Devolucion".equals(type) && restore == null) {
+                    showMessage(getString(R.string.key_cannot_remove_return),
+                        getString(R.string.key_missing_previous_take, key.name));
+                    return;
+                }
+                confirmKeyCancellation(key, type, target, restore, date);
+            })
+            .addOnFailureListener(error -> showMessage(getString(R.string.error_read_schedules),
+                friendlyError(error)));
+    }
+
+    private void confirmKeyCancellation(KeyItem key, String type, DocumentSnapshot target,
+                                        DocumentSnapshot restore, String date) {
+        new AlertDialog.Builder(this)
+            .setTitle(getString(R.string.key_remove_movement_title, keyMovementLabel(type)))
+            .setMessage(getString(R.string.key_remove_movement_message,
+                keyMovementLabel(type), key.name, shownTime(target)))
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.confirm_remove, (dialog, which) ->
+                saveKeyCancellation(key, type, target, restore, date))
+            .show();
+    }
+
+    private void saveKeyCancellation(KeyItem key, String type, DocumentSnapshot target,
+                                     DocumentSnapshot restore, String date) {
+        if (!pendingMovements.add(key.id)) return;
+        adapter.notifyDataSetChanged();
+        String time = currentTime();
+        String registeredBy = currentUser();
+        DocumentReference keyReference = database.collection("llaves").document(key.id);
+        DocumentReference metaReference = database.collection("meta").document("config");
+        DocumentReference targetReference = database.collection("movimientosLlaves")
+            .document(target.getId());
+        DocumentReference restoreReference = restore == null ? null
+            : database.collection("movimientosLlaves").document(restore.getId());
+        toast(getString(R.string.key_removing_movement, keyMovementLabel(type)));
+        database.runTransaction(transaction -> {
+            DocumentSnapshot current = transaction.get(keyReference);
+            DocumentSnapshot config = transaction.get(metaReference);
+            DocumentSnapshot targetStored = transaction.get(targetReference);
+            DocumentSnapshot restoreStored = restoreReference == null
+                ? null : transaction.get(restoreReference);
+            if (!targetStored.exists()
+                || !target.getId().equals(current.getString("ultimoMovimientoId"))) {
+                throw new IllegalStateException(getString(R.string.key_record_changed));
+            }
+            boolean cancelTake = "Retiro".equals(type);
+            if ((cancelTake && !"Prestada".equals(current.getString("estado")))
+                || (!cancelTake && !"Disponible".equals(current.getString("estado")))) {
+                throw new IllegalStateException(getString(R.string.key_record_changed));
+            }
+            if (restoreStored != null && !restoreStored.exists()) {
+                throw new IllegalStateException(getString(R.string.key_record_changed));
+            }
+            if (!cancelTake && restoreStored == null) {
+                throw new IllegalStateException(getString(R.string.key_missing_previous_take, key.name));
+            }
+            long next = nextNumber(config, "siguienteMovimientoLlave");
+            String cancellationId = String.format(Locale.US, "L%06d", next);
+            Map<String, Object> cancellation = new HashMap<>();
+            cancellation.put("movimientoId", cancellationId);
+            cancellation.put("llaveId", key.id);
+            cancellation.put("llaveNombre", key.name);
+            cancellation.put("movimiento", cancelTake ? "AnulacionRetiro" : "AnulacionDevolucion");
+            String personId = cancelTake
+                ? text(targetStored.getString("personaId")) : text(restoreStored.getString("personaId"));
+            String personName = cancelTake
+                ? text(targetStored.getString("persona")) : text(restoreStored.getString("persona"));
+            cancellation.put("personaId", personId);
+            cancellation.put("persona", personName);
+            cancellation.put("quienRetiraId", personId);
+            cancellation.put("quienRetira", personName);
+            cancellation.put("fecha", date);
+            cancellation.put("hora", time);
+            cancellation.put("usuario", registeredBy);
+            cancellation.put("creado", FieldValue.serverTimestamp());
+            cancellation.put("anulaA", target.getId());
+            if (restoreStored != null && restoreStored.exists()) {
+                cancellation.put("restauraA", restoreStored.getId());
+            }
+            transaction.set(database.collection("movimientosLlaves").document(cancellationId), cancellation);
+
+            Map<String, Object> keyUpdate = new HashMap<>();
+            if (cancelTake && restoreStored == null) {
+                keyUpdate.put("estado", "Disponible");
+                keyUpdate.put("quienTiene", "");
+                keyUpdate.put("quienTieneId", "");
+                keyUpdate.put("fechaRetiro", "");
+                keyUpdate.put("horaRetiro", "");
+                keyUpdate.put("ultimoMovimiento", "Devolucion");
+                keyUpdate.put("ultimoMovimientoId", cancellationId);
+                keyUpdate.put("ultimaFecha", date);
+                keyUpdate.put("ultimaHora", time);
+            } else if (cancelTake) {
+                keyUpdate.put("estado", "Disponible");
+                keyUpdate.put("quienTiene", "");
+                keyUpdate.put("quienTieneId", "");
+                keyUpdate.put("fechaRetiro", "");
+                keyUpdate.put("horaRetiro", "");
+                keyUpdate.put("ultimoMovimiento", "Devolucion");
+                keyUpdate.put("ultimoMovimientoId", restoreStored.getId());
+                keyUpdate.put("ultimaFecha", text(restoreStored.getString("fecha")));
+                keyUpdate.put("ultimaHora", shownTime(restoreStored));
+            } else {
+                keyUpdate.put("estado", "Prestada");
+                keyUpdate.put("quienTiene", text(restoreStored.getString("persona")));
+                keyUpdate.put("quienTieneId", text(restoreStored.getString("personaId")));
+                keyUpdate.put("fechaRetiro", text(restoreStored.getString("fecha")));
+                keyUpdate.put("horaRetiro", shownTime(restoreStored));
+                keyUpdate.put("ultimoMovimiento", "Retiro");
+                keyUpdate.put("ultimoMovimientoId", restoreStored.getId());
+                keyUpdate.put("ultimaFecha", text(restoreStored.getString("fecha")));
+                keyUpdate.put("ultimaHora", shownTime(restoreStored));
+            }
+            keyUpdate.put("actualizado", FieldValue.serverTimestamp());
+            transaction.update(keyReference, keyUpdate);
+            transaction.set(metaReference,
+                Collections.singletonMap("siguienteMovimientoLlave", next + 1), SetOptions.merge());
+            return cancellationId;
+        }).addOnSuccessListener(cancellationId -> {
+            finishKeyMovement(key.id);
+            toast(getString(R.string.key_movement_removed_today,
+                keyMovementLabel(type), key.name));
+        }).addOnFailureListener(error -> {
+            finishKeyMovement(key.id);
+            showMessage(getString(R.string.key_remove_failed), friendlyError(error));
+        });
+    }
+
+    private static DocumentSnapshot previousKeyMovement(List<DocumentSnapshot> movements,
+                                                        DocumentSnapshot target, String type) {
+        DocumentSnapshot previous = null;
+        for (DocumentSnapshot movement : movements) {
+            if (!type.equals(movement.getString("movimiento"))
+                || movement.getId().equals(target.getId())
+                || compareKeyMovements(movement, target) >= 0) continue;
+            if (previous == null || compareKeyMovements(movement, previous) > 0) previous = movement;
+        }
+        return previous;
+    }
+
+    private static DocumentSnapshot newerKeyMovement(DocumentSnapshot current,
+                                                     DocumentSnapshot candidate) {
+        if (current == null) return candidate;
+        return compareKeyMovements(candidate, current) > 0 ? candidate : current;
+    }
+
+    private static int compareKeyMovements(DocumentSnapshot left, DocumentSnapshot right) {
+        int date = Long.compare(dayOrder(left.getString("fecha")), dayOrder(right.getString("fecha")));
+        if (date != 0) return date;
+        int time = Integer.compare(minutes(shownTime(left)), minutes(shownTime(right)));
+        if (time != 0) return time;
+        Timestamp leftCreated = left.getTimestamp("creado");
+        Timestamp rightCreated = right.getTimestamp("creado");
+        if (leftCreated != null && rightCreated != null) {
+            int created = leftCreated.compareTo(rightCreated);
+            if (created != 0) return created;
+        }
+        return left.getId().compareTo(right.getId());
+    }
+
+    private static long dayOrder(String value) {
+        try {
+            Date parsed = new SimpleDateFormat("dd/MM/yyyy", Locale.US).parse(text(value));
+            return parsed == null ? Long.MIN_VALUE : parsed.getTime();
+        } catch (Exception ignored) {
+            return Long.MIN_VALUE;
+        }
+    }
+
+    private static int minutes(String value) {
+        try {
+            String[] parts = value.substring(0, 5).split(":");
+            return Integer.parseInt(parts[0]) * 60 + Integer.parseInt(parts[1]);
+        } catch (Exception ignored) {
+            return -1;
+        }
+    }
+
+    private static String shownTime(DocumentSnapshot document) {
+        String value = document == null ? "" : text(document.getString("hora"));
+        return value.length() >= 5 ? value.substring(0, 5) : value;
+    }
+
+    private static String text(String value) {
+        return value == null ? "" : value;
+    }
+
+    private String keyMovementLabel(String type) {
+        return "Retiro".equals(type) ? getString(R.string.key_take_label)
+            : getString(R.string.key_return_label);
     }
 
     private void showMainMenu(View anchor) {

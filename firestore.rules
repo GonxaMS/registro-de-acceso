@@ -183,6 +183,47 @@ service cloud.firestore {
           && request.resource.data.ultimoMovimiento == 'Devolucion'
           && getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.movimiento == 'Devolucion';
       }
+      function validLoanCorrection() {
+        return resource.data.estado == 'Prestada'
+          && request.resource.data.estado == 'Prestada'
+          && request.resource.data.quienTiene is string
+          && request.resource.data.quienTieneId is string
+          && request.resource.data.fechaRetiro == request.resource.data.ultimaFecha
+          && request.resource.data.horaRetiro == request.resource.data.ultimaHora
+          && request.resource.data.ultimoMovimiento == 'Retiro'
+          && getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.movimiento == 'Retiro'
+          && getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.esCorreccion == true
+          && getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.reemplazaA == resource.data.ultimoMovimientoId
+          && getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.personaId == request.resource.data.quienTieneId
+          && getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.persona == request.resource.data.quienTiene;
+      }
+      function validReturnCorrection() {
+        return resource.data.estado == 'Disponible'
+          && request.resource.data.estado == 'Disponible'
+          && request.resource.data.quienTiene == ''
+          && request.resource.data.quienTieneId == ''
+          && request.resource.data.fechaRetiro == ''
+          && request.resource.data.horaRetiro == ''
+          && request.resource.data.ultimoMovimiento == 'Devolucion'
+          && getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.movimiento == 'Devolucion'
+          && getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.esCorreccion == true
+          && getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.reemplazaA == resource.data.ultimoMovimientoId;
+      }
+      function validKeyCorrectionAfter() {
+        return validLoanCorrection() || validReturnCorrection();
+      }
+      function validKeyCancellationReturn() {
+        return resource.data.estado == 'Prestada'
+          && request.resource.data.estado == 'Disponible'
+          && request.resource.data.quienTiene == ''
+          && request.resource.data.quienTieneId == ''
+          && request.resource.data.fechaRetiro == ''
+          && request.resource.data.horaRetiro == ''
+          && request.resource.data.ultimoMovimiento == 'Devolucion'
+          && getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.movimiento == 'AnulacionRetiro'
+          && getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.anulaA == resource.data.ultimoMovimientoId
+          && !getAfter(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.ultimoMovimientoId)).data.keys().hasAny(['restauraA']);
+      }
       allow read: if hasAccess() || isService();
       allow create: if hasAccess()
         && id.matches('K[0-9]{4}')
@@ -205,7 +246,9 @@ service cloud.firestore {
         ])
         && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activo'])
             && resource.data.estado == 'Disponible')
-          || (validKeyMovementAfter() && (validLoan() || validReturn())));
+          || (validKeyMovementAfter()
+            && (validLoan() || validReturn() || validKeyCorrectionAfter()
+              || validKeyCancellationReturn())));
       allow delete: if false;
     }
 
@@ -291,13 +334,84 @@ service cloud.firestore {
             || (request.resource.data.movimiento == 'AnulacionDevolucion'
               && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.anulaA)).data.movimiento == 'Devolucion'));
       }
+      function validKeyCorrectionMovement() {
+        return request.resource.data.esCorreccion == true
+          && request.resource.data.reemplazaA is string
+          && request.resource.data.reemplazaA.matches('L[0-9]{6}')
+          && request.resource.data.reemplazaA != id
+          && !request.resource.data.keys().hasAny(['anulaA'])
+          && request.resource.data.movimiento in ['Retiro','Devolucion']
+          && exists(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.reemplazaA))
+          && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.reemplazaA)).data.llaveId
+            == request.resource.data.llaveId
+          && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.reemplazaA)).data.fecha
+            == request.resource.data.fecha
+          && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.reemplazaA)).data.movimiento
+            == request.resource.data.movimiento
+          && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.reemplazaA)).data.personaId
+            == request.resource.data.personaId
+          && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.reemplazaA)).data.persona
+            == request.resource.data.persona
+          && get(/databases/$(database)/documents/llaves/$(request.resource.data.llaveId)).data.ultimaFecha
+            == request.resource.data.fecha;
+      }
+      function validKeyCorrectionLink() {
+        return (get(/databases/$(database)/documents/llaves/$(request.resource.data.llaveId)).data.ultimoMovimientoId
+            == request.resource.data.reemplazaA
+          && getAfter(/databases/$(database)/documents/llaves/$(request.resource.data.llaveId)).data.ultimoMovimientoId == id)
+          || (get(/databases/$(database)/documents/llaves/$(request.resource.data.llaveId)).data.ultimoMovimientoId
+            != request.resource.data.reemplazaA
+          && getAfter(/databases/$(database)/documents/llaves/$(request.resource.data.llaveId)).data.ultimoMovimientoId
+            == get(/databases/$(database)/documents/llaves/$(request.resource.data.llaveId)).data.ultimoMovimientoId);
+      }
+      function validKeyCancellationMovement() {
+        return request.resource.data.anulaA is string
+          && request.resource.data.anulaA.matches('L[0-9]{6}')
+          && request.resource.data.anulaA != id
+          && request.resource.data.movimiento in ['AnulacionRetiro','AnulacionDevolucion']
+          && exists(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.anulaA))
+          && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.anulaA)).data.llaveId
+            == request.resource.data.llaveId
+          && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.anulaA)).data.fecha
+            == request.resource.data.fecha
+          && get(/databases/$(database)/documents/llaves/$(request.resource.data.llaveId)).data.ultimoMovimientoId
+            == request.resource.data.anulaA
+          && ((request.resource.data.movimiento == 'AnulacionRetiro'
+              && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.anulaA)).data.movimiento == 'Retiro'
+              && ((!request.resource.data.keys().hasAny(['restauraA'])
+                && getAfter(/databases/$(database)/documents/llaves/$(request.resource.data.llaveId)).data.ultimoMovimientoId == id)
+              || (request.resource.data.restauraA is string
+                && request.resource.data.restauraA.matches('L[0-9]{6}')
+                && exists(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.restauraA))
+                && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.restauraA)).data.llaveId
+                  == request.resource.data.llaveId
+                && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.restauraA)).data.movimiento == 'Devolucion'
+                && getAfter(/databases/$(database)/documents/llaves/$(request.resource.data.llaveId)).data.ultimoMovimientoId
+                  == request.resource.data.restauraA)))
+            || (request.resource.data.movimiento == 'AnulacionDevolucion'
+              && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.anulaA)).data.movimiento == 'Devolucion'
+              && request.resource.data.restauraA is string
+              && request.resource.data.restauraA.matches('L[0-9]{6}')
+              && exists(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.restauraA))
+              && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.restauraA)).data.llaveId
+                == request.resource.data.llaveId
+              && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.restauraA)).data.movimiento == 'Retiro'
+              && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.restauraA)).data.personaId
+                == request.resource.data.personaId
+              && get(/databases/$(database)/documents/movimientosLlaves/$(request.resource.data.restauraA)).data.persona
+                == request.resource.data.persona
+              && request.resource.data.quienRetiraId == request.resource.data.personaId
+              && request.resource.data.quienRetira == request.resource.data.persona
+              && getAfter(/databases/$(database)/documents/llaves/$(request.resource.data.llaveId)).data.ultimoMovimientoId
+                == request.resource.data.restauraA));
+      }
       allow read: if hasAccess() || isService();
       allow create: if hasAccess()
         && id.matches('L[0-9]{6}')
         && request.resource.data.keys().hasOnly([
           'movimientoId','llaveId','llaveNombre','movimiento','personaId','persona',
           'quienRetiraId','quienRetira','quienDevuelveId','quienDevuelve',
-          'fecha','hora','usuario','creado','esAjusteAdmin','esCorreccion','reemplazaA','anulaA'
+          'fecha','hora','usuario','creado','esAjusteAdmin','esCorreccion','reemplazaA','anulaA','restauraA'
         ])
         && request.resource.data.movimientoId == id
         && request.resource.data.llaveId.matches('K[0-9]{4}')
@@ -306,9 +420,15 @@ service cloud.firestore {
         && request.resource.data.hora.matches('[0-2][0-9]:[0-5][0-9]')
         && validKeyUser()
         && validKeyPerson()
-        && ((validKeyReference()
-            && !request.resource.data.keys().hasAny(['esAjusteAdmin','esCorreccion','reemplazaA','anulaA'])
+          && ((validKeyReference()
+            && !request.resource.data.keys().hasAny(['esAjusteAdmin','esCorreccion','reemplazaA','anulaA','restauraA'])
             && (validTake() || validReturn()))
+          || (!request.resource.data.keys().hasAny(['esAjusteAdmin','anulaA'])
+            && validKeyCorrectionMovement()
+            && validKeyCorrectionLink()
+            && (validTake() || validReturn()))
+          || (!request.resource.data.keys().hasAny(['esAjusteAdmin','esCorreccion','reemplazaA'])
+            && validKeyCancellationMovement())
           || (isAdmin() && validAdminCorrection() && (validTake() || validReturn()))
           || (isAdmin() && validAdminCancellation()));
       allow update, delete: if false;
