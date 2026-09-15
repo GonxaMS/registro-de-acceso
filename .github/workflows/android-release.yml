@@ -2,9 +2,12 @@ name: Android Release APK
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - "v*"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   assemble-release:
@@ -51,11 +54,25 @@ jobs:
       - name: Build release APK
         run: ./gradlew --no-daemon assembleRelease
 
+      - name: Prepare release APK
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          cp app/build/outputs/apk/release/app-release.apk "Registro-de-Acceso-v${version}.apk"
+
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
           name: registro-de-acceso-${{ github.run_number }}-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          path: Registro-de-Acceso-v*.apk
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "Registro-de-Acceso-v${GITHUB_REF_NAME#v}.apk" \
+            --title "Registro de Acceso $GITHUB_REF_NAME" \
+            --generate-notes
 
       - name: Remove signing material
         if: always()
