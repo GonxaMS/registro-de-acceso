@@ -27,7 +27,7 @@ import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.SetOptions;
-import com.google.firebase.firestore.Timestamp;
+import com.google.firebase.Timestamp;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
