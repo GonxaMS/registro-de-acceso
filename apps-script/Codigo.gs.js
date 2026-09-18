@@ -1205,6 +1205,10 @@ function obtenerColumnasFecha(hoja, fecha) {
 }
 
 function formatearBloqueFechaPersonal(hoja, columna, fecha) {
+  const columnasFaltantes = columna + 1 - hoja.getMaxColumns();
+  if (columnasFaltantes > 0) {
+    hoja.insertColumnsAfter(hoja.getMaxColumns(), columnasFaltantes);
+  }
   const color = ((columna - 2) / 2) % 2 === 0 ? "#fff2cc" : "#c9daf8";
   hoja.getRange(1, columna, 1, 2).breakApart().clearContent().merge();
   hoja.getRange(1, columna).setValue("Fecha " + limpiarFecha(fecha));

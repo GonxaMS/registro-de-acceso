@@ -112,6 +112,56 @@ if (!source.includes("insertColumnsBefore(columna, 4)")) {
   throw new Error("Llaves debe insertar fechas atrasadas en orden cronológico");
 }
 
+function crearRangoPrueba(valores) {
+  const rango = {
+    breakApart() { return rango; },
+    clearContent() { return rango; },
+    merge() { return rango; },
+    setValue() { return rango; },
+    setValues() { return rango; },
+    setBackground() { return rango; },
+    setHorizontalAlignment() { return rango; },
+    setBorder() { return rango; },
+    setFontWeight() { return rango; },
+    setVerticalAlignment() { return rango; },
+    getDisplayValues() { return valores || [[""]]; }
+  };
+  return rango;
+}
+
+let columnasMaximas = 26;
+const columnasInsertadas = [];
+const hojaAlLimite = {
+  getLastColumn() { return 25; },
+  getMaxColumns() { return columnasMaximas; },
+  getMaxRows() { return 100; },
+  insertColumnsAfter(columna, cantidad) {
+    columnasInsertadas.push({columna, cantidad});
+    columnasMaximas += cantidad;
+  },
+  getRange(fila, columna, filas, columnas) {
+    if (columna + columnas - 1 > columnasMaximas) {
+      throw new Error("Rango fuera de la grilla de prueba");
+    }
+    if (fila === 1 && columna === 2 && filas === 1 && columnas === 24) {
+      return crearRangoPrueba([new Array(24).fill("")]);
+    }
+    return crearRangoPrueba();
+  },
+  setColumnWidth() {}
+};
+context.SpreadsheetApp = {BorderStyle: {SOLID: "SOLID"}};
+assertEqual(context.obtenerColumnasFecha(hojaAlLimite, "13/09/2026"), 26,
+  "La fecha 13 debe continuar en la siguiente pareja de columnas");
+assertEqual(columnasMaximas, 27,
+  "Personal debe ampliar la grilla antes de escribir fuera de Z");
+assertEqual(columnasInsertadas.length, 1,
+  "Personal debe ampliar la grilla una sola vez");
+assertEqual(columnasInsertadas[0].columna, 26,
+  "Las columnas nuevas deben agregarse al final de la hoja");
+assertEqual(columnasInsertadas[0].cantidad, 1,
+  "Solo debe agregarse la columna faltante");
+
 function crearPropiedadesPrueba(iniciales) {
   const valores = Object.assign({}, iniciales);
   return {
