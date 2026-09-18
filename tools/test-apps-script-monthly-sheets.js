@@ -90,6 +90,18 @@ if (!source.includes("leerColeccionCompletaFirestore(firebase, token, \"movimien
 if (!source.includes(".everyMinutes(1)")) {
   throw new Error("La sincronización de Firebase debe ejecutarse cada minuto");
 }
+if (!source.includes("obtenerLibroPlanilla(config)")) {
+  throw new Error("La sincronizacion debe reutilizar la apertura de la planilla");
+}
+if (!source.includes("CacheService.getScriptCache()")) {
+  throw new Error("El token de Firebase debe reutilizarse entre ejecuciones");
+}
+if (!source.includes("MINUTOS_BACKOFF_SINCRONIZACION")) {
+  throw new Error("Los fallos temporales deben activar backoff");
+}
+if (!source.includes("escribirFilasEnBloque")) {
+  throw new Error("Los movimientos deben escribirse en bloques");
+}
 if (!source.includes("erroresSincronizacion")) {
   throw new Error("Los fallos de sincronización deben quedar registrados");
 }
@@ -120,11 +132,12 @@ function sondearSincronizacion(contadores, iniciales, ejecutarRehacer) {
   const lecturasDocumentos = [];
   const lecturasColecciones = [];
   const solicitudesRehacer = [];
+  let flushes = 0;
   context.PropertiesService = {getScriptProperties: () => propiedades};
   context.LockService = {
     getScriptLock: () => ({tryLock: () => true, releaseLock() {}})
   };
-  context.SpreadsheetApp = {flush() {}};
+  context.SpreadsheetApp = {flush() {flushes++}};
   context.obtenerConfiguracion = () => ({planillaId: "planilla-prueba"});
   context.obtenerConfiguracionFirebase = () => ({
     projectId: "proyecto-prueba",
@@ -149,7 +162,8 @@ function sondearSincronizacion(contadores, iniciales, ejecutarRehacer) {
   const resultado = ejecutarRehacer
     ? context.sincronizarDesdeFirebase()
     : context.sincronizarDatosDesdeFirebase();
-  return {resultado, lecturasDocumentos, lecturasColecciones, solicitudesRehacer, propiedades};
+  return {resultado, lecturasDocumentos, lecturasColecciones, solicitudesRehacer,
+    propiedades, flushes};
 }
 
 const estadoEstable = sondearSincronizacion({
@@ -167,6 +181,8 @@ assertEqual(estadoEstable.lecturasDocumentos[0].coleccion, "meta",
   "La consulta de control debe leer meta/config");
 assertEqual(estadoEstable.lecturasColecciones.length, 0,
   "Con estado estable no se leen movimientos");
+assertEqual(estadoEstable.flushes, 0,
+  "Con estado estable no se debe hacer flush de Sheets");
 assertEqual(estadoEstable.solicitudesRehacer[0], false,
   "Con marcador estable no se consulta el comando");
 
@@ -183,6 +199,9 @@ assertEqual(personalNuevo.lecturasColecciones.join(","), "movimientos",
   "Un contador personal nuevo debe leer solo movimientos");
 assertEqual(personalNuevo.propiedades.valor("FIREBASE_ULTIMO_CONTADOR_PERSONAL"), "12",
   "El contador personal leído debe quedar asentado");
+
+assertEqual(personalNuevo.flushes, 1,
+  "Un cambio debe hacer un unico flush de Sheets");
 
 const llavesNuevas = sondearSincronizacion({
   siguienteMovimiento: 12,
@@ -211,5 +230,34 @@ assertEqual(rehacerNuevo.solicitudesRehacer[0], true,
   "Un marcador nuevo debe habilitar la consulta del comando");
 assertEqual(rehacerNuevo.propiedades.valor("FIREBASE_ULTIMO_CONTADOR_REHACER"), "4",
   "El marcador de rehacer debe quedar asentado");
+
+const propiedadesBackoff = crearPropiedadesPrueba({});
+const primerFallo = context.registrarFalloLocalSincronizacion(propiedadesBackoff,
+  "Service Spreadsheets failed");
+assertEqual(primerFallo.debeRegistrarRemoto, true,
+  "El primer fallo debe registrarse remotamente");
+if (!context.obtenerEsperaSincronizacion(propiedadesBackoff)) {
+  throw new Error("Un fallo debe bloquear el siguiente intento inmediato");
+}
+const segundoFallo = context.registrarFalloLocalSincronizacion(propiedadesBackoff,
+  "Service Spreadsheets failed");
+assertEqual(segundoFallo.minutos, 2,
+  "El segundo fallo debe ampliar el backoff");
+
+let aperturasPlanilla = 0;
+const libroPrueba = {};
+context.SpreadsheetApp = {
+  openById() {
+    aperturasPlanilla++;
+    return libroPrueba;
+  }
+};
+const configPlanilla = {planillaId: "planilla-prueba"};
+if (context.obtenerLibroPlanilla(configPlanilla) !== libroPrueba
+    || context.obtenerLibroPlanilla(configPlanilla) !== libroPrueba) {
+  throw new Error("La planilla cacheada debe devolver la misma instancia");
+}
+assertEqual(aperturasPlanilla, 1,
+  "La planilla debe abrirse una sola vez por ejecucion");
 
 console.log("Contrato mensual de Google Sheets: OK");

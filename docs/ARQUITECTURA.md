@@ -42,3 +42,5 @@ consultarla.
 9. El estado y los errores quedan disponibles para la pantalla de Admin.
 
 Firestore siempre es la fuente de verdad. Un error de Sheets no revierte el movimiento: el siguiente ciclo vuelve a encontrar el ID pendiente y lo reintenta.
+
+Apps Script reutiliza el token de Firebase durante aproximadamente 50 minutos y abre la planilla una sola vez por ejecución. Los movimientos nuevos se escriben en bloques y las vistas se ordenan una vez por lote. Si Sheets, Auth o Firestore devuelven un fallo temporal, activa backoff de 1, 2, 4, 8 y hasta 10 minutos; el error remoto se registra como máximo una vez cada 15 minutos.

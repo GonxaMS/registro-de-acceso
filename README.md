@@ -15,6 +15,7 @@ Aplicación Android privada para registrar ingresos, salidas y préstamos de lla
 - Historial inmutable y correlativo para movimientos de operarios y llaves.
 - Copia automática, persistente e idempotente a pestañas mensuales de Google Sheets, con reintentos al recuperar la conexión.
 - Sincronización de Apps Script cada minuto con lectura de control liviana: solo consulta movimientos cuando cambian sus contadores.
+- Reintentos protegidos con backoff, token Firebase en caché, apertura única de Sheets y escrituras de movimientos en bloque.
 - Permisos remotos `Administrativo`, `Normal` y `Bloqueado` por UID de Firebase.
 - Registro en Admin de errores de la app que persisten después de reintentar.
 - Panel administrativo unificado con accesos rápidos, estado de Sheets y reconstrucción mensual.

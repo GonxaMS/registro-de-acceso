@@ -12,16 +12,29 @@ const ULTIMO_LLAVES_FIREBASE = "FIREBASE_ULTIMO_LLAVES";
 const ULTIMO_CONTADOR_PERSONAL_FIREBASE = "FIREBASE_ULTIMO_CONTADOR_PERSONAL";
 const ULTIMO_CONTADOR_LLAVES_FIREBASE = "FIREBASE_ULTIMO_CONTADOR_LLAVES";
 const ULTIMO_CONTADOR_REHACER_FIREBASE = "FIREBASE_ULTIMO_CONTADOR_REHACER";
+const TOKEN_FIREBASE_CACHE = "FIREBASE_ID_TOKEN";
+const REINTENTO_SINCRONIZACION_NO_ANTES = "SYNC_REINTENTO_NO_ANTES";
+const FALLOS_CONSECUTIVOS_SINCRONIZACION = "SYNC_FALLOS_CONSECUTIVOS";
+const ULTIMO_ERROR_SINCRONIZACION = "SYNC_ULTIMO_ERROR";
+const ULTIMO_ERROR_SINCRONIZACION_REGISTRADO = "SYNC_ULTIMO_ERROR_REGISTRADO";
+const MINUTOS_BACKOFF_SINCRONIZACION = [1, 2, 4, 8, 10];
+const INTERVALO_REGISTRO_ERROR_MS = 15 * 60 * 1000;
+const DURACION_TOKEN_CACHE_SEGUNDOS = 3000;
 const TAMANO_LOTE_FIREBASE = 500;
 
 function configurarSincronizacionFirebase(projectId, apiKey) {
   projectId = texto(projectId);
   apiKey = texto(apiKey);
   if (!projectId || !apiKey) throw new Error("Proyecto y API key son obligatorios");
-  PropertiesService.getScriptProperties().setProperties({
+  const propiedades = PropertiesService.getScriptProperties();
+  propiedades.setProperties({
     FIREBASE_PROJECT_ID: projectId,
     FIREBASE_API_KEY: apiKey
   }, false);
+  propiedades.setProperty("FIREBASE_REFRESH_TOKEN", "");
+  propiedades.setProperty("FIREBASE_UID", "");
+  limpiarTokenFirebaseCache();
+  limpiarEstadoReintentoSincronizacion(propiedades);
   const config = obtenerConfiguracionFirebase();
   obtenerTokenFirebase(config);
   return {ok: true, projectId: projectId,
@@ -259,7 +272,7 @@ function claveMesDocumento(documento) {
 }
 
 function reiniciarVistaPersonal(config, fechaMes) {
-  const libro = SpreadsheetApp.openById(config.planillaId);
+  const libro = obtenerLibroPlanilla(config);
   const nombre = nombreHojaRegistros(fechaMes);
   let hoja = libro.getSheetByName(nombre);
   if (!hoja) hoja = libro.insertSheet(nombre, 0);
@@ -276,7 +289,7 @@ function reiniciarVistaPersonal(config, fechaMes) {
 }
 
 function reiniciarVistaLlaves(config, fechaMes) {
-  const libro = SpreadsheetApp.openById(config.planillaId);
+  const libro = obtenerLibroPlanilla(config);
   const nombre = nombreHojaLlaves(fechaMes);
   let hoja = libro.getSheetByName(nombre);
   if (!hoja) hoja = libro.insertSheet(nombre);
@@ -291,12 +304,26 @@ function reiniciarVistaLlaves(config, fechaMes) {
  * descarta los IDs ya asentados y copia los pendientes en orden.
  */
 function sincronizarDesdeFirebase() {
+  const propiedades = PropertiesService.getScriptProperties();
+  const espera = obtenerEsperaSincronizacion(propiedades);
+  if (espera) {
+    console.log(JSON.stringify(espera));
+    return espera;
+  }
+
   const resultado = sincronizarDatosDesdeFirebase();
-  const reconstruccion = procesarSolicitudRehacerPlanillas(resultado.debeConsultarRehacer);
+  let reconstruccion = null;
+  try {
+    reconstruccion = procesarSolicitudRehacerPlanillas(resultado.debeConsultarRehacer);
+  } catch (error) {
+    registrarFalloLocalSincronizacion(propiedades, mensajeError(error));
+    throw error;
+  }
   if (resultado.marcadorRehacer !== undefined) {
-    PropertiesService.getScriptProperties().setProperty(
+    propiedades.setProperty(
       ULTIMO_CONTADOR_REHACER_FIREBASE, resultado.marcadorRehacer);
   }
+  limpiarEstadoReintentoSincronizacion(propiedades);
   delete resultado.debeConsultarRehacer;
   delete resultado.marcadorRehacer;
   if (reconstruccion) resultado.reconstruccion = reconstruccion;
@@ -331,16 +358,16 @@ function sincronizarDatosDesdeFirebase() {
     };
     resultado.debeConsultarRehacer = debeConsultarRehacer;
     resultado.marcadorRehacer = cambios.marcadorRehacer;
-    if (hayCambiosPersonal) {
-      firebase.propiedades.setProperty(
-        ULTIMO_CONTADOR_PERSONAL_FIREBASE, cambios.contadorPersonal);
-    }
-    if (hayCambiosLlaves) {
-      firebase.propiedades.setProperty(
-        ULTIMO_CONTADOR_LLAVES_FIREBASE, cambios.contadorLlaves);
-    }
-    SpreadsheetApp.flush();
     if (hayCambiosPersonal || hayCambiosLlaves) {
+      SpreadsheetApp.flush();
+      if (hayCambiosPersonal) {
+        firebase.propiedades.setProperty(
+          ULTIMO_CONTADOR_PERSONAL_FIREBASE, cambios.contadorPersonal);
+      }
+      if (hayCambiosLlaves) {
+        firebase.propiedades.setProperty(
+          ULTIMO_CONTADOR_LLAVES_FIREBASE, cambios.contadorLlaves);
+      }
       guardarEstadoSincronizacion(firebase, token, {
         estado: "Correcto",
         ultimaEjecucion: new Date(),
@@ -353,7 +380,9 @@ function sincronizarDatosDesdeFirebase() {
     return resultado;
   } catch (error) {
     const mensaje = mensajeError(error);
-    if (firebase && token) {
+    const fallo = registrarFalloLocalSincronizacion(
+      firebase ? firebase.propiedades : PropertiesService.getScriptProperties(), mensaje);
+    if (firebase && token && fallo.debeRegistrarRemoto) {
       try {
         guardarEstadoSincronizacion(firebase, token, {
           estado: "Error",
@@ -394,6 +423,49 @@ function detectarCambiosSincronizacion(contadores, propiedades) {
     debeConsultarRehacer: !marcadorRehacerAnterior
       || marcadorRehacer !== marcadorRehacerAnterior
   };
+}
+
+function obtenerEsperaSincronizacion(propiedades) {
+  const reintentoNoAntes = Number(propiedades.getProperty(REINTENTO_SINCRONIZACION_NO_ANTES));
+  const ahora = Date.now();
+  if (!isFinite(reintentoNoAntes) || reintentoNoAntes <= ahora) return null;
+  return {
+    omitida: true,
+    motivo: "Backoff activo tras un fallo temporal de sincronizacion",
+    reintentoEn: new Date(reintentoNoAntes).toISOString(),
+    esperaMinutos: Math.ceil((reintentoNoAntes - ahora) / 60000)
+  };
+}
+
+function registrarFalloLocalSincronizacion(propiedades, mensaje) {
+  const ahora = Date.now();
+  const fallosAnteriores = Number(
+    propiedades.getProperty(FALLOS_CONSECUTIVOS_SINCRONIZACION)) || 0;
+  const fallos = Math.min(fallosAnteriores + 1, MINUTOS_BACKOFF_SINCRONIZACION.length);
+  const minutos = MINUTOS_BACKOFF_SINCRONIZACION[fallos - 1];
+  const firma = texto(mensaje).substring(0, 500) || "Error de sincronizacion desconocido";
+  const ultimoError = texto(propiedades.getProperty(ULTIMO_ERROR_SINCRONIZACION));
+  const ultimaHoraRegistro = Number(
+    propiedades.getProperty(ULTIMO_ERROR_SINCRONIZACION_REGISTRADO)) || 0;
+  const debeRegistrarRemoto = !ultimaHoraRegistro
+    || firma !== ultimoError
+    || ahora - ultimaHoraRegistro >= INTERVALO_REGISTRO_ERROR_MS;
+
+  propiedades.setProperty(FALLOS_CONSECUTIVOS_SINCRONIZACION, String(fallos));
+  propiedades.setProperty(REINTENTO_SINCRONIZACION_NO_ANTES,
+    String(ahora + minutos * 60 * 1000));
+  propiedades.setProperty(ULTIMO_ERROR_SINCRONIZACION, firma);
+  if (debeRegistrarRemoto) {
+    propiedades.setProperty(ULTIMO_ERROR_SINCRONIZACION_REGISTRADO, String(ahora));
+  }
+  return {debeRegistrarRemoto: debeRegistrarRemoto, minutos: minutos};
+}
+
+function limpiarEstadoReintentoSincronizacion(propiedades) {
+  propiedades.setProperty(REINTENTO_SINCRONIZACION_NO_ANTES, "");
+  propiedades.setProperty(FALLOS_CONSECUTIVOS_SINCRONIZACION, "0");
+  propiedades.setProperty(ULTIMO_ERROR_SINCRONIZACION, "");
+  propiedades.setProperty(ULTIMO_ERROR_SINCRONIZACION_REGISTRADO, "");
 }
 
 function procesarSolicitudRehacerPlanillas(debeConsultar) {
@@ -439,27 +511,47 @@ function procesarSolicitudRehacerPlanillas(debeConsultar) {
 function sincronizarMovimientosPersonales(documentos, config) {
   const datos = obtenerDatosRegistros(config);
   const procesados = idsProcesados(datos);
+  const filasNuevas = [];
+  config.filasRegistros = {};
+  config.hojasRegistrosOrdenar = {};
   let copiados = 0;
   documentos.sort(ordenDocumento).forEach(documento => {
     if (procesados[documento.id]) return;
-    aplicarMovimientoPersonal(documento, config, datos);
+    filasNuevas.push(aplicarMovimientoPersonal(documento, config, datos));
     procesados[documento.id] = true;
     copiados++;
   });
+  escribirFilasEnBloque(datos, filasNuevas, 7);
+  ordenarHojasPendientes(config, "hojasRegistrosOrdenar", ordenarRegistros);
   return copiados;
 }
 
 function sincronizarMovimientosLlaves(documentos, config) {
   const datos = obtenerDatosLlaves(config);
   const procesados = idsProcesados(datos);
+  const indice = indiceMovimientosLlaves(datos);
+  const filasNuevas = [];
+  config.hojasLlavesOrdenar = {};
   let copiados = 0;
   documentos.sort(ordenDocumento).forEach(documento => {
     if (procesados[documento.id]) return;
-    aplicarMovimientoLlave(documento, config, datos);
+    filasNuevas.push(aplicarMovimientoLlave(documento, config, datos, indice));
     procesados[documento.id] = true;
     copiados++;
   });
+  escribirFilasEnBloque(datos, filasNuevas, 12);
+  ordenarHojasPendientes(config, "hojasLlavesOrdenar", ordenarVistaLlaves);
   return copiados;
+}
+
+function escribirFilasEnBloque(hoja, filas, columnas) {
+  if (!filas.length) return;
+  hoja.getRange(hoja.getLastRow() + 1, 1, filas.length, columnas).setValues(filas);
+}
+
+function ordenarHojasPendientes(config, propiedad, ordenar) {
+  const hojas = config[propiedad] || {};
+  Object.keys(hojas).forEach(nombre => ordenar(hojas[nombre]));
 }
 
 function idsProcesados(hoja) {
@@ -489,7 +581,13 @@ function obtenerConfiguracionFirebase() {
   return {projectId: projectId, apiKey: apiKey, propiedades: propiedades};
 }
 
-function obtenerTokenFirebase(config) {
+function obtenerTokenFirebase(config, forzarRenovacion) {
+  const cache = obtenerCacheTokenFirebase();
+  if (!forzarRenovacion && cache) {
+    const tokenCacheado = texto(cache.get(TOKEN_FIREBASE_CACHE));
+    if (tokenCacheado) return tokenCacheado;
+  }
+
   const refreshToken = texto(config.propiedades.getProperty("FIREBASE_REFRESH_TOKEN"));
   let respuesta;
   if (refreshToken) {
@@ -527,7 +625,21 @@ function obtenerTokenFirebase(config) {
   if (!token) throw new Error("Firebase Auth no devolvió un token");
   if (nuevoRefresh) config.propiedades.setProperty("FIREBASE_REFRESH_TOKEN", nuevoRefresh);
   if (uid) config.propiedades.setProperty("FIREBASE_UID", uid);
+  if (cache) cache.put(TOKEN_FIREBASE_CACHE, token, DURACION_TOKEN_CACHE_SEGUNDOS);
   return token;
+}
+
+function obtenerCacheTokenFirebase() {
+  try {
+    return typeof CacheService === "undefined" ? null : CacheService.getScriptCache();
+  } catch (error) {
+    return null;
+  }
+}
+
+function limpiarTokenFirebaseCache() {
+  const cache = obtenerCacheTokenFirebase();
+  if (cache) cache.remove(TOKEN_FIREBASE_CACHE);
 }
 
 function sincronizarColeccionFirestore(config, token, coleccion, propiedadUltimoId,
@@ -576,6 +688,7 @@ function leerPendientesFirestore(config, token, coleccion, ultimoId) {
     muteHttpExceptions: true
   });
   if (respuesta.getResponseCode() >= 400) {
+    if (respuesta.getResponseCode() === 401) limpiarTokenFirebaseCache();
     throw new Error("Firestore " + coleccion + " " + respuesta.getResponseCode()
       + ": " + respuesta.getContentText());
   }
@@ -621,6 +734,7 @@ function escribirDocumentoFirestore(config, token, coleccion, id, datos) {
     muteHttpExceptions: true
   });
   if (respuesta.getResponseCode() >= 400) {
+    if (respuesta.getResponseCode() === 401) limpiarTokenFirebaseCache();
     throw new Error("Firestore escritura " + respuesta.getResponseCode()
       + ": " + respuesta.getContentText());
   }
@@ -638,6 +752,7 @@ function leerDocumentoFirestore(config, token, coleccion, id) {
   });
   if (respuesta.getResponseCode() === 404) return null;
   if (respuesta.getResponseCode() >= 400) {
+    if (respuesta.getResponseCode() === 401) limpiarTokenFirebaseCache();
     throw new Error("Firestore lectura " + respuesta.getResponseCode()
       + ": " + respuesta.getContentText());
   }
@@ -694,7 +809,7 @@ function aplicarMovimientoPersonal(documento, config, datos) {
   }
 
   const registros = obtenerRegistros(config, fecha);
-  const fila = obtenerFilaRegistro(registros, nombre);
+  const fila = obtenerFilaRegistro(registros, nombre, false, config.filasRegistros);
   const entrada = obtenerColumnasFecha(registros, fecha);
   if (movimiento === "anulacioningreso") {
     registros.getRange(fila, entrada).clearContent();
@@ -705,11 +820,11 @@ function aplicarMovimientoPersonal(documento, config, datos) {
     registros.getRange(fila, columna)
       .setNumberFormat("HH:mm").setValue(hora).setHorizontalAlignment("center");
   }
-  ordenarRegistros(registros);
-  datos.appendRow([movimientoId, fecha, hora, personalId, nombre, movimiento, false]);
+  config.hojasRegistrosOrdenar[registros.getName()] = registros;
+  return [movimientoId, fecha, hora, personalId, nombre, movimiento, false];
 }
 
-function aplicarMovimientoLlave(documento, config, datos) {
+function aplicarMovimientoLlave(documento, config, datos, indice) {
   const movimientoId = texto(documento.id);
   const llaveId = texto(documento.llaveId);
   const llave = texto(documento.llaveNombre);
@@ -730,22 +845,43 @@ function aplicarMovimientoLlave(documento, config, datos) {
 
   const objetivoId = texto(documento.reemplazaA || documento.anulaA);
   if (objetivoId) {
-    const objetivo = obtenerMovimientoLlaveDatos(datos, objetivoId);
+    const objetivo = obtenerMovimientoLlaveDatos(datos, objetivoId, indice);
     if (!objetivo) throw new Error("No se encontró el movimiento de llave a modificar: " + objetivoId);
     quitarMovimientoVistaLlaves(config, objetivo);
   }
 
-  datos.appendRow([
+  const filaDatos = [
     movimientoId, fecha, hora, llaveId, llave, movimiento || movimientoNormal,
     personaId, persona, usuario, texto(documento.reemplazaA), texto(documento.anulaA),
     documento.esAjusteAdmin === true
-  ]);
-  if (!movimiento) return;
-  actualizarVistaLlaves(obtenerRegistrosLlaves(config, fecha),
-    llave, fecha, hora, movimiento, persona);
+  ];
+  indice[movimientoId] = movimientoLlaveDesdeFila(filaDatos);
+  if (!movimiento) return filaDatos;
+  const hoja = obtenerRegistrosLlaves(config, fecha);
+  actualizarVistaLlaves(hoja, llave, fecha, hora, movimiento, persona, false);
+  config.hojasLlavesOrdenar[hoja.getName()] = hoja;
+  return filaDatos;
 }
 
-function obtenerMovimientoLlaveDatos(datos, movimientoId) {
+function indiceMovimientosLlaves(datos) {
+  const resultado = {};
+  if (datos.getLastRow() < 2) return resultado;
+  const valores = datos.getRange(2, 1, datos.getLastRow() - 1, 9).getDisplayValues();
+  valores.forEach(fila => {
+    const movimientoId = texto(fila[0]);
+    if (movimientoId) resultado[movimientoId] = movimientoLlaveDesdeFila(fila);
+  });
+  return resultado;
+}
+
+function movimientoLlaveDesdeFila(fila) {
+  return {id: texto(fila[0]), fecha: texto(fila[1]), hora: texto(fila[2]),
+    llaveId: texto(fila[3]), llave: texto(fila[4]), movimiento: texto(fila[5]),
+    personaId: texto(fila[6]), persona: texto(fila[7])};
+}
+
+function obtenerMovimientoLlaveDatos(datos, movimientoId, indice) {
+  if (indice && indice[movimientoId]) return indice[movimientoId];
   if (datos.getLastRow() < 2) return null;
   const valores = datos.getRange(2, 1, datos.getLastRow() - 1, 9).getDisplayValues();
   for (let indice = valores.length - 1; indice >= 0; indice--) {
@@ -784,7 +920,7 @@ function quitarParLinea(celdaHora, celdaPersona, hora, persona) {
 }
 
 function obtenerDatosRegistros(config) {
-  const libro = SpreadsheetApp.openById(config.planillaId);
+  const libro = obtenerLibroPlanilla(config);
   let hoja = libro.getSheetByName(HOJA_REGISTROS_DATOS);
   if (!hoja) hoja = libro.insertSheet(HOJA_REGISTROS_DATOS);
   if (texto(hoja.getRange(1, 1).getDisplayValue()) !== "Movimiento ID") {
@@ -798,7 +934,7 @@ function obtenerDatosRegistros(config) {
   return hoja;
 }
 function obtenerDatosLlaves(config) {
-  const libro = SpreadsheetApp.openById(config.planillaId);
+  const libro = obtenerLibroPlanilla(config);
   let hoja = libro.getSheetByName(HOJA_LLAVES_DATOS);
   if (!hoja) hoja = libro.insertSheet(HOJA_LLAVES_DATOS);
   if (texto(hoja.getRange(1, 1).getDisplayValue()) !== "Movimiento ID") {
@@ -814,11 +950,14 @@ function obtenerDatosLlaves(config) {
 }
 
 function obtenerRegistrosLlaves(config, fecha) {
-  const libro = SpreadsheetApp.openById(config.planillaId);
   const nombreHoja = nombreHojaLlaves(fecha);
+  config.hojasLlaves = config.hojasLlaves || {};
+  if (config.hojasLlaves[nombreHoja]) return config.hojasLlaves[nombreHoja];
+  const libro = obtenerLibroPlanilla(config);
   let hoja = libro.getSheetByName(nombreHoja);
   if (!hoja) hoja = libro.insertSheet(nombreHoja);
   prepararBaseLlaves(hoja);
+  config.hojasLlaves[nombreHoja] = hoja;
   return hoja;
 }
 
@@ -841,19 +980,22 @@ function prepararBaseLlaves(hoja) {
       formatearBloqueFechaLlave(hoja, columna, fecha);
     }
   }
-}function actualizarVistaLlaves(hoja, llave, fecha, hora, movimiento, persona) {
+}function actualizarVistaLlaves(hoja, llave, fecha, hora, movimiento, persona, ordenar) {
   let fila = buscarFilaLlave(hoja, llave);
   if (fila === -1) {
     fila = Math.max(hoja.getLastRow() + 1, 3);
     hoja.getRange(fila, 1).setValue(llave);
-    ordenarVistaLlaves(hoja);
-    fila = buscarFilaLlave(hoja, llave);
+    if (ordenar !== false) {
+      ordenarVistaLlaves(hoja);
+      fila = buscarFilaLlave(hoja, llave);
+    }
   }
 
   const columna = obtenerColumnasFechaLlave(hoja, fecha);
   const esRetiro = movimiento === "Retiro";
-  agregarValorCelda(hoja.getRange(fila, esRetiro ? columna : columna + 2), hora);
-  agregarValorCelda(hoja.getRange(fila, esRetiro ? columna + 1 : columna + 3), persona);
+  agregarParLinea(
+    hoja.getRange(fila, esRetiro ? columna : columna + 2),
+    hoja.getRange(fila, esRetiro ? columna + 1 : columna + 3), hora, persona);
   aplicarFormatoFilaVistaLlave(hoja, fila);
 }
 
@@ -920,9 +1062,31 @@ function obtenerColumnasFechaLlave(hoja, fecha) {
       .setBackground("#c9daf8")
       .setBorder(true, true, true, true, true, true, "#000000", SpreadsheetApp.BorderStyle.SOLID);
   }
-}function agregarValorCelda(celda, valor) {
-  const anterior = texto(celda.getDisplayValue());
-  celda.setValue(anterior ? anterior + "\n" + valor : valor).setWrap(true);
+}function agregarParLinea(celdaHora, celdaPersona, hora, persona) {
+  const horas = texto(celdaHora.getDisplayValue()).split("\n").filter(Boolean);
+  const personas = texto(celdaPersona.getDisplayValue()).split("\n").filter(Boolean);
+  const longitud = Math.max(horas.length, personas.length);
+  for (let indice = 0; indice < longitud; indice++) {
+    if (texto(horas[indice]) === texto(hora) && texto(personas[indice]) === texto(persona)) {
+      return;
+    }
+  }
+  for (let indice = 0; indice < longitud; indice++) {
+    if (!texto(horas[indice]) && texto(personas[indice]) === texto(persona)) {
+      horas[indice] = hora;
+      celdaHora.setValue(horas.join("\n")).setWrap(true);
+      return;
+    }
+    if (texto(horas[indice]) === texto(hora) && !texto(personas[indice])) {
+      personas[indice] = persona;
+      celdaPersona.setValue(personas.join("\n")).setWrap(true);
+      return;
+    }
+  }
+  horas.push(hora);
+  personas.push(persona);
+  celdaHora.setValue(horas.join("\n")).setWrap(true);
+  celdaPersona.setValue(personas.join("\n")).setWrap(true);
 }
 
 function aplicarFormatoFilaVistaLlave(hoja, fila) {
@@ -960,8 +1124,10 @@ function ordenarRegistros(hoja) {
 }
 
 function obtenerRegistros(config, fecha) {
-  const libro = SpreadsheetApp.openById(config.planillaId);
   const nombreHoja = nombreHojaRegistros(fecha);
+  config.hojasRegistros = config.hojasRegistros || {};
+  if (config.hojasRegistros[nombreHoja]) return config.hojasRegistros[nombreHoja];
+  const libro = obtenerLibroPlanilla(config);
   let hoja = libro.getSheetByName(nombreHoja);
   if (!hoja) {
     hoja = libro.insertSheet(nombreHoja, 0);
@@ -972,21 +1138,48 @@ function obtenerRegistros(config, fecha) {
     hoja.getRange(2, 1, hoja.getMaxRows() - 1, 1).setBackground("#b6d7a8")
       .setBorder(true, true, true, true, true, true, "#000000", SpreadsheetApp.BorderStyle.SOLID);
   }
+  config.hojasRegistros[nombreHoja] = hoja;
   return hoja;
 }
 
-function obtenerFilaRegistro(hoja, nombre) {
+function obtenerFilaRegistro(hoja, nombre, ordenar, cache) {
+  const clave = normal(nombre);
+  const nombreHoja = hoja.getName();
+  if (cache && cache[nombreHoja] && cache[nombreHoja][clave]) {
+    return cache[nombreHoja][clave];
+  }
   if (hoja.getLastRow() >= 3) {
     const nombres = hoja.getRange(3, 1, hoja.getLastRow() - 2, 1).getDisplayValues();
     for (let i = 0; i < nombres.length; i++) {
-      if (normal(nombres[i][0]) === normal(nombre)) return i + 3;
+      if (normal(nombres[i][0]) === clave) {
+        const filaExistente = i + 3;
+        if (cache) {
+          if (!cache[nombreHoja]) cache[nombreHoja] = {};
+          cache[nombreHoja][clave] = filaExistente;
+        }
+        return filaExistente;
+      }
     }
   }
   const fila = Math.max(hoja.getLastRow() + 1, 3);
   hoja.getRange(fila, 1).setValue(nombre).setBackground("#b6d7a8");
   colorearFila(hoja, fila);
-  ordenarRegistros(hoja);
-  return obtenerFilaRegistro(hoja, nombre);
+  if (ordenar !== false) ordenarRegistros(hoja);
+  const filaResultado = ordenar === false ? fila : buscarFilaRegistro(hoja, clave);
+  if (cache) {
+    if (!cache[nombreHoja]) cache[nombreHoja] = {};
+    cache[nombreHoja][clave] = filaResultado;
+  }
+  return filaResultado;
+}
+
+function buscarFilaRegistro(hoja, nombreNormalizado) {
+  if (hoja.getLastRow() < 3) return -1;
+  const nombres = hoja.getRange(3, 1, hoja.getLastRow() - 2, 1).getDisplayValues();
+  for (let i = 0; i < nombres.length; i++) {
+    if (normal(nombres[i][0]) === nombreNormalizado) return i + 3;
+  }
+  return -1;
 }
 
 function obtenerColumnasFecha(hoja, fecha) {
@@ -1047,6 +1240,11 @@ function obtenerConfiguracion() {
   const planillaId = texto(propiedades.getProperty("ID_PLANILLA"));
   if (!planillaId) throw new Error("Falta ID_PLANILLA en Apps Script");
   return {planillaId: planillaId};
+}
+
+function obtenerLibroPlanilla(config) {
+  if (!config.libro) config.libro = SpreadsheetApp.openById(config.planillaId);
+  return config.libro;
 }
 
 function texto(valor) { return String(valor == null ? "" : valor).trim(); }

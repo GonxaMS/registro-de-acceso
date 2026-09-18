@@ -71,9 +71,11 @@ de movimientos ni el documento de comandos. Cuando cambia un contador, consulta 
 colección correspondiente y usa las hojas técnicas ocultas para omitir IDs ya procesados. Cuando
 cambia el marcador, consulta `comandosAdmin/rehacerPlanillas` y reconstruye solo si está Pendiente.
 Los fallos se guardan en `erroresSincronizacion` y el último estado en `sincronizacion/sheets`;
-la pantalla de Admin muestra ambos.
+la pantalla de Admin muestra ambos. El sincronizador aplica backoff progresivo de 1, 2, 4, 8 y hasta
+10 minutos después de un fallo temporal, y limita el registro remoto del mismo error a una vez cada
+15 minutos para no generar escrituras repetitivas durante una caída.
 
-Apps Script requiere FIREBASE_PROJECT_ID y FIREBASE_API_KEY en sus propiedades privadas. El token anónimo renovable se conserva como FIREBASE_REFRESH_TOKEN.
+Apps Script requiere FIREBASE_PROJECT_ID y FIREBASE_API_KEY en sus propiedades privadas. El token anónimo renovable se conserva como FIREBASE_REFRESH_TOKEN y el token de acceso se reutiliza temporalmente en CacheService.
 Si ese token deja de poder renovarse, el sincronizador informa el error y conserva el UID esperado;
 no crea automáticamente otra identidad sin autorización. La recuperación requiere ejecutar nuevamente
 la configuración y autorizar explícitamente el UID devuelto en `servicios`.
