@@ -50,8 +50,8 @@ Script.
 
 Para iniciar Firebase local, el teléfono Android virtual, cargar datos de prueba, compilar, instalar y abrir la aplicación:
 
-```powershell
-.\tools\start-local-test.ps1 -ResetApp
+```text
+node tools/local-test.mjs start --reset-app
 ```
 
 La prueba local contiene tres operarios y dos llaves. Cada inicio limpia los datos anteriores para que la prueba sea repetible. La aplicación usa únicamente Firebase local y desactiva la copia a Google Sheets, por lo que no modifica producción.
@@ -60,9 +60,13 @@ El estado local se puede inspeccionar en http://127.0.0.1:4000.
 
 Para detener todo:
 
-```powershell
-.\tools\stop-local-test.ps1 -StopAndroidEmulator
+```text
+node tools/local-test.mjs stop --stop-android-emulator
 ```
+
+El cargado de datos también puede ejecutarse por separado con `node tools/local-test.mjs seed`.
+El script obtiene el Android SDK desde `local.properties`, utiliza el `firebase-tools` local del
+proyecto y guarda los logs temporales en `build/local-test/`.
 
 ### Compilación normal
 
@@ -88,6 +92,6 @@ Nunca modificar el `package_name` dentro de `google-services.json` para simular 
 
 - `versionCode` aumenta en cada APK distribuida.
 - `versionName` usa `mayor.menor.parche`.
-- La versión actual documentada es `3.10.7` (`versionCode 61`).
+- La versión actual documentada es `3.10.8` (`versionCode 62`).
 - Los APK entregados usan el nombre `RegistroAcceso-vX.Y.Z.apk`.
 - Las compilaciones de entrega se firman con la clave estable del proyecto desde GitHub Actions.

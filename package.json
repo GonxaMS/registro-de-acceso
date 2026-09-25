@@ -6,7 +6,10 @@
     "test:sheets": "node tools/test-apps-script-monthly-sheets.js",
     "test:firebase": "firebase emulators:exec --only firestore --project registro-guardias-test \"node tools/test-firestore-rules.js && node tools/test-firestore-integration.js\"",
     "test:rules": "firebase emulators:exec --only firestore --project registro-guardias-test \"node tools/test-firestore-rules.js\"",
-    "test:integration": "firebase emulators:exec --only firestore --project registro-guardias-test \"node tools/test-firestore-integration.js\""
+    "test:integration": "firebase emulators:exec --only firestore --project registro-guardias-test \"node tools/test-firestore-integration.js\"",
+    "local:start": "node tools/local-test.mjs start",
+    "local:seed": "node tools/local-test.mjs seed",
+    "local:stop": "node tools/local-test.mjs stop"
   },
   "devDependencies": {
     "@google/clasp": "^2.4.2",

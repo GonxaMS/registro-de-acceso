@@ -53,8 +53,8 @@ npm test
 
 Todas las pruebas de Firebase se ejecutan contra un emulador local aislado.
 
-```powershell
-.\tools\start-local-test.ps1 -ResetApp
+```text
+node tools/local-test.mjs start --reset-app
 ```
 
 Este comando abre un teléfono virtual y una copia local de Firebase con datos de prueba. Consulta los detalles en [Desarrollo local](docs/DESARROLLO_LOCAL.md).
